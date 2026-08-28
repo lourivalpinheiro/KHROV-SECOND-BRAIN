@@ -86,10 +86,10 @@ export function AppSidebar({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar notas..."
-            className="pl-7"
+            className="pl-7 sm:pr-16"
           />
           <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
-            ⌘K
+            Ctrl+K
           </kbd>
         </form>
       </SidebarHeader>
