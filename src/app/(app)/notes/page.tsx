@@ -1,0 +1,168 @@
+"use client";
+
+import { useMemo } from "react";
+import useSWR, { mutate } from "swr";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FileText, Folder, Plus, Trash2 } from "lucide-react";
+import { fetcher, postJSON, deleteJSON } from "@/lib/api-client";
+import type { FolderDTO, NoteListItem, TagDTO } from "@/types/models";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { NotesFilterBar } from "@/components/notes-filter-bar";
+import { useConfirm } from "@/hooks/use-confirm";
+import { toast } from "sonner";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function NotesPage() {
+  const router = useRouter();
+  const { confirm, ConfirmDialog } = useConfirm();
+  const searchParams = useSearchParams();
+  const folderId = searchParams.get("folder");
+  const tagId = searchParams.get("tag");
+  const tagIds = searchParams.get("tags");
+  const q = searchParams.get("q");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  const query = useMemo(() => {
+    const params = new URLSearchParams();
+    if (folderId) params.set("folderId", folderId);
+    if (tagId) params.set("tagId", tagId);
+    if (tagIds) params.set("tagIds", tagIds);
+    if (q) params.set("q", q);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const qs = params.toString();
+    return `/api/notes${qs ? `?${qs}` : ""}`;
+  }, [folderId, tagId, tagIds, q, from, to]);
+
+  const { data: notes, isLoading } = useSWR<NoteListItem[]>(query, fetcher);
+  const { data: folders } = useSWR<FolderDTO[]>(folderId ? "/api/folders" : null, fetcher);
+  const { data: tags } = useSWR<TagDTO[]>(tagId ? "/api/tags" : null, fetcher);
+
+  const activeFolder = folders?.find((f) => f.id === folderId);
+  const activeTag = tags?.find((t) => t.id === tagId);
+
+  const heading = activeFolder
+    ? activeFolder.name
+    : activeTag
+      ? `#${activeTag.name}`
+      : "Todas as notas";
+
+  async function createNote() {
+    try {
+      const note = await postJSON<{ id: string }>("/api/notes", { folderId });
+      router.push(`/notes/${note.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
+    }
+  }
+
+  async function removeNote(e: React.MouseEvent, note: NoteListItem) {
+    e.stopPropagation();
+    const ok = await confirm({
+      title: `Excluir "${note.title || "Nota sem título"}"?`,
+      description: "Essa ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteJSON(`/api/notes/${note.id}`);
+      await mutate(query);
+      await mutate((key) => typeof key === "string" && (key === "/api/folders" || key === "/api/tags"));
+      toast.success("Nota excluída.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao excluir a nota.");
+    }
+  }
+
+  return (
+    <ScrollArea className="flex-1">
+      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{heading}</h1>
+          <Button onClick={createNote}>
+            <Plus /> Nova nota
+          </Button>
+        </div>
+
+        <NotesFilterBar />
+
+        {isLoading && (
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-xl" />
+            ))}
+          </div>
+        )}
+
+        {!isLoading && notes && notes.length === 0 && (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center text-muted-foreground">
+            <FileText className="size-8" />
+            <p>Nenhuma nota encontrada.</p>
+            <Button variant="outline" onClick={createNote}>
+              <Plus /> Criar nota
+            </Button>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {notes?.map((note) => (
+            <div
+              key={note.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => router.push(`/notes/${note.id}`)}
+              onKeyDown={(e) => e.key === "Enter" && router.push(`/notes/${note.id}`)}
+              className="group/note-card flex flex-col gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/40"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="line-clamp-1 font-medium">{note.title || "Nota sem título"}</h2>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-xs text-muted-foreground">{formatDate(note.updatedAt)}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => removeNote(e, note)}
+                    title="Excluir nota"
+                    className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/note-card:opacity-100"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+              {note.plainText && (
+                <p className="line-clamp-2 text-sm text-muted-foreground">{note.plainText}</p>
+              )}
+              {(note.folder || note.tags.length > 0) && (
+                <div className="flex flex-wrap items-center gap-1 pt-1">
+                  {note.folder && (
+                    <Badge variant="outline" className="gap-1 text-[11px] text-muted-foreground">
+                      <Folder className="size-3" />
+                      {note.folder.name}
+                    </Badge>
+                  )}
+                  {note.tags.map(({ tag }) => (
+                    <Badge key={tag.id} variant="secondary" className="text-[11px]">
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {ConfirmDialog}
+    </ScrollArea>
+  );
+}

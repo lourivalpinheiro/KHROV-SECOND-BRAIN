@@ -1,0 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { BrainCircuit, FileText, Layers, Network, Plus, Search } from "lucide-react";
+import { postJSON } from "@/lib/api-client";
+import { toast } from "sonner";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
+import { Input } from "@/components/ui/input";
+import { FolderTree } from "@/components/folder-tree";
+import { TagList } from "@/components/tag-list";
+import { UserMenu } from "@/components/user-menu";
+
+export function AppSidebar({
+  user,
+}: {
+  user: { name?: string | null; email?: string | null; image?: string | null };
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [creating, setCreating] = useState(false);
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+
+  async function createNote() {
+    setCreating(true);
+    try {
+      const note = await postJSON<{ id: string }>("/api/notes", {});
+      router.push(`/notes/${note.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    router.push(q.trim() ? `/notes?q=${encodeURIComponent(q.trim())}` : "/notes");
+  }
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="gap-3">
+        <div className="flex items-center gap-2 pt-1">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <BrainCircuit className="size-4" />
+          </div>
+          <span className="truncate font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            Thought Chain
+          </span>
+        </div>
+
+        <form
+          onSubmit={submitSearch}
+          className="relative group-data-[collapsible=icon]:hidden"
+        >
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar notas..."
+            className="pl-7"
+          />
+        </form>
+      </SidebarHeader>
+
+      <SidebarContent className="gap-4 py-2">
+        <SidebarMenu className="gap-1 px-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={createNote}
+              disabled={creating}
+              tooltip="Nova nota"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+            >
+              <Plus /> Nova nota
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        <SidebarMenu className="gap-1 px-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/notes" && !searchParams.get("folder") && !searchParams.get("tag")}
+              onClick={() => router.push("/notes")}
+              tooltip="Todas as notas"
+            >
+              <FileText /> Todas as notas
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/graph"}
+              onClick={() => router.push("/graph")}
+              tooltip="Grafo"
+            >
+              <Network /> Grafo
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/flashcards"}
+              onClick={() => router.push("/flashcards")}
+              tooltip="Flashcards"
+            >
+              <Layers /> Flashcards
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        <SidebarSeparator className="my-0" />
+
+        <FolderTree />
+        <TagList />
+      </SidebarContent>
+
+      <SidebarFooter>
+        <UserMenu name={user.name} email={user.email} image={user.image} />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}

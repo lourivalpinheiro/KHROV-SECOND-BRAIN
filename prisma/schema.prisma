@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  image        String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  folders     Folder[]
+  notes       Note[]
+  tags        Tag[]
+  attachments Attachment[]
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderToFolder")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     Note[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   Json
+  plainText String   @default("")
+  folderId  String?
+  folder    Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tags        NoteTag[]
+  attachments Attachment[]
+
+  linksOut NoteLink[] @relation("SourceNote")
+  linksIn  NoteLink[] @relation("TargetNote")
+
+  @@index([userId])
+  @@index([folderId])
+}
+
+model Tag {
+  id     String @id @default(cuid())
+  name   String
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes  NoteTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+  note   Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+}
+
+model NoteLink {
+  id           String @id @default(cuid())
+  sourceNoteId String
+  targetNoteId String
+  source       Note   @relation("SourceNote", fields: [sourceNoteId], references: [id], onDelete: Cascade)
+  target       Note   @relation("TargetNote", fields: [targetNoteId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNoteId, targetNoteId])
+  @@index([targetNoteId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  r2Key     String
+  mimeType  String
+  size      Int
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+  @@index([userId])
+}
