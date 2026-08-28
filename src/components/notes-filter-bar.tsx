@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { CalendarRange, Search, Tags, X } from "lucide-react";
+import { CalendarRange, Search, Tags, X, ListFilter } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
+import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ export function NotesFilterBar() {
   const debouncedQ = useDebounced(q, 400);
 
   const selectedTagIds = searchParams.get("tags")?.split(",").filter(Boolean) ?? [];
+  const selectedTypes = searchParams.get("types")?.split(",").filter(Boolean) ?? [];
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
 
@@ -62,7 +64,21 @@ export function NotesFilterBar() {
     setParams({ tags: next.length ? next.join(",") : null });
   }
 
-  const hasFilters = !!(q || selectedTagIds.length || from || to || searchParams.get("tag"));
+  function toggleType(type: string) {
+    const next = selectedTypes.includes(type)
+      ? selectedTypes.filter((t) => t !== type)
+      : [...selectedTypes, type];
+    setParams({ types: next.length ? next.join(",") : null });
+  }
+
+  const hasFilters = !!(
+    q ||
+    selectedTagIds.length ||
+    selectedTypes.length ||
+    from ||
+    to ||
+    searchParams.get("tag")
+  );
 
   function clearAll() {
     setQ("");
@@ -82,6 +98,43 @@ export function NotesFilterBar() {
       </div>
 
       <div className="flex items-center gap-2">
+      <Popover>
+        <PopoverTrigger
+          render={
+            <Button variant="outline" size="sm" className="h-8">
+              <ListFilter className="size-3.5" />
+              Tipo
+              {selectedTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">
+                  {selectedTypes.length}
+                </Badge>
+              )}
+            </Button>
+          }
+        />
+        <PopoverContent align="start" className="w-64">
+          <div className="space-y-0.5">
+            {NOTE_TYPES.map((type) => {
+              const meta = NOTE_TYPE_META[type];
+              const Icon = meta.icon;
+              return (
+                <label
+                  key={type}
+                  className="flex items-center gap-2 rounded-sm px-1 py-1.5 text-sm hover:bg-accent"
+                >
+                  <Checkbox
+                    checked={selectedTypes.includes(type)}
+                    onCheckedChange={() => toggleType(type)}
+                  />
+                  <Icon className="size-3.5 text-muted-foreground" />
+                  {meta.label}
+                </label>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Popover>
         <PopoverTrigger
           render={

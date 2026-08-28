@@ -33,6 +33,7 @@ export default function NotesPage() {
   const q = searchParams.get("q");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
+  const types = searchParams.get("types");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -42,9 +43,10 @@ export default function NotesPage() {
     if (q) params.set("q", q);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    if (types) params.set("types", types);
     const qs = params.toString();
     return `/api/notes${qs ? `?${qs}` : ""}`;
-  }, [folderId, tagId, tagIds, q, from, to]);
+  }, [folderId, tagId, tagIds, q, from, to, types]);
 
   const { data: notes, isLoading } = useSWR<NoteListItem[]>(query, fetcher);
   const { data: folders } = useSWR<FolderDTO[]>(folderId ? "/api/folders" : null, fetcher);

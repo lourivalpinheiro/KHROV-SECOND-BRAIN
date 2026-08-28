@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 import { EMPTY_DOC } from "@/lib/doc-utils";
-import { isNoteType } from "@/lib/note-types";
+import { isNoteType, type NoteTypeValue } from "@/lib/note-types";
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+    const types = (searchParams.get("types")?.split(",").filter(isNoteType) ?? []) as NoteTypeValue[];
 
     const allTagIds = tagId ? [tagId, ...tagIds] : tagIds;
 
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
       where: {
         userId,
         ...(folderId ? { folderId } : {}),
+        ...(types.length ? { type: { in: types } } : {}),
         // exige que a nota tenha TODAS as tags selecionadas
         ...(allTagIds.length ? { AND: allTagIds.map((id) => ({ tags: { some: { tagId: id } } })) } : {}),
         ...(updatedAt ? { updatedAt } : {}),

@@ -47,9 +47,14 @@ export function GraphView() {
     if (!data || data.nodes.length === 0) return null;
 
     const degree = new Map<string, number>();
+    // Filhas diretas de cada nó: notas pra onde ele linka (wikilink de saída).
+    // Ao arrastar a "nota mãe" no grafo, essas filhas vêm junto.
+    const childrenOf = new Map<string, string[]>();
     for (const l of data.links) {
       degree.set(l.source, (degree.get(l.source) ?? 0) + 1);
       degree.set(l.target, (degree.get(l.target) ?? 0) + 1);
+      if (!childrenOf.has(l.source)) childrenOf.set(l.source, []);
+      childrenOf.get(l.source)!.push(l.target);
     }
 
     const nodes: GraphNode[] = data.nodes.map((n) => ({ ...n }));
@@ -71,7 +76,7 @@ export function GraphView() {
       .force("collide", forceCollide(34))
       .stop();
 
-    return { nodes, links, degree, sim };
+    return { nodes, links, degree, childrenOf, sim };
   }, [data]);
 
   // Roda a simulação em tempo real (em vez de resolver as 300 iterações de
@@ -154,15 +159,18 @@ export function GraphView() {
     if (dragNodeId.current) {
       dragMoved.current = true;
       const id = dragNodeId.current;
+      const dx = e.movementX / transform.k;
+      const dy = e.movementY / transform.k;
+      // Arrasta a nota "mãe" e as filhas dela (notas pra onde ela linka) junto,
+      // como um grupo — a mesma variação de posição pra todas.
+      const idsToMove = [id, ...(layout?.childrenOf.get(id) ?? [])];
       setPositions((prev) => {
-        const current = prev[id] ?? { x: 0, y: 0 };
-        return {
-          ...prev,
-          [id]: {
-            x: current.x + e.movementX / transform.k,
-            y: current.y + e.movementY / transform.k,
-          },
-        };
+        const next = { ...prev };
+        for (const nid of idsToMove) {
+          const current = prev[nid] ?? { x: 0, y: 0 };
+          next[nid] = { x: current.x + dx, y: current.y + dy };
+        }
+        return next;
       });
       return;
     }

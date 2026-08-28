@@ -30,14 +30,14 @@ export function NoteTypeSelect({
           <Icon className="size-3.5 text-muted-foreground" />
           <SelectValue>{() => meta.label}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="w-80 max-w-[calc(100vw-2rem)]">
           {NOTE_TYPES.map((t) => {
             const ItemIcon = NOTE_TYPE_META[t].icon;
             return (
-              <SelectItem key={t} value={t}>
-                <span className="flex items-center gap-2">
-                  <ItemIcon className="size-3.5 text-muted-foreground" />
-                  <span className="flex flex-col">
+              <SelectItem key={t} value={t} className="py-1.5">
+                <span className="flex min-w-0 items-start gap-2 whitespace-normal">
+                  <ItemIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="flex min-w-0 flex-col">
                     <span>{NOTE_TYPE_META[t].label}</span>
                     <span className="text-xs text-muted-foreground">{NOTE_TYPE_META[t].description}</span>
                   </span>
