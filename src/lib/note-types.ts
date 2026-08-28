@@ -1,4 +1,4 @@
-import { Lightbulb, BookOpen, Gem, type LucideIcon } from "lucide-react";
+import { Pill, BookOpen, Gem, type LucideIcon } from "lucide-react";
 
 /**
  * Estágios de maturidade da nota, inspirados no método Zettelkasten:
@@ -17,7 +17,7 @@ export const NOTE_TYPE_META: Record<
   FLEETING: {
     label: "Pílulas",
     description: "Captura rápida, ainda crua — o primeiro registro de um pensamento.",
-    icon: Lightbulb,
+    icon: Pill,
   },
   LITERATURE: {
     label: "Notas de leitura",
