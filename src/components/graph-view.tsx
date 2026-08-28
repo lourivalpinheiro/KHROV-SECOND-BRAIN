@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import {
@@ -55,6 +55,9 @@ export function GraphView() {
     const nodes: GraphNode[] = data.nodes.map((n) => ({ ...n }));
     const links: GraphLink[] = data.links.map((l) => ({ source: l.source, target: l.target }));
 
+    // .stop() impede o timer interno do d3 de rodar sozinho — a gente avança
+    // a simulação manualmente no useEffect abaixo, sincronizado com rAF, pra
+    // dar tempo de renderizar cada passo (animação do grafo "se formando").
     const sim = forceSimulation(nodes)
       .force(
         "link",
@@ -68,20 +71,34 @@ export function GraphView() {
       .force("collide", forceCollide(34))
       .stop();
 
-    for (let i = 0; i < 300; i++) sim.tick();
-
-    return { nodes, links, degree };
+    return { nodes, links, degree, sim };
   }, [data]);
 
-  // Posições iniciais (da simulação) — depois disso cada nó pode ser arrastado livremente.
-  // Ajuste de estado durante a renderização (padrão oficial do React pra resetar
-  // estado quando uma prop/derivação muda: https://react.dev/learn/you-might-not-need-an-effect),
-  // usando estado (não ref) pra guardar o "anterior" já que refs não podem ser lidas no render.
-  const [prevLayout, setPrevLayout] = useState<typeof layout>(null);
-  if (layout && layout !== prevLayout) {
-    setPrevLayout(layout);
-    setPositions(Object.fromEntries(layout.nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }])));
-  }
+  // Roda a simulação em tempo real (em vez de resolver as 300 iterações de
+  // uma vez só) toda vez que o grafo é (re)carregado, pra ver os nós saindo
+  // do centro e se acomodando. Depois que a simulação esfria (ou o usuário
+  // arrasta um nó), positions passa a ser a única fonte de verdade.
+  useEffect(() => {
+    if (!layout) return;
+    const { sim, nodes } = layout;
+    let raf = 0;
+    let cancelled = false;
+
+    function step() {
+      if (cancelled) return;
+      sim.tick();
+      setPositions(Object.fromEntries(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }])));
+      if (sim.alpha() > sim.alphaMin()) {
+        raf = requestAnimationFrame(step);
+      }
+    }
+    raf = requestAnimationFrame(step);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [layout]);
 
   function nodePos(n: GraphNode): Point {
     return positions[n.id] ?? { x: n.x ?? 0, y: n.y ?? 0 };

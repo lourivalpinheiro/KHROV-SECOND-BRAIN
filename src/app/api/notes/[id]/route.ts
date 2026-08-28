@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
 import { extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
 import { syncNoteLinks, syncNoteTags } from "@/lib/notes-service";
+import { isNoteType } from "@/lib/note-types";
 
 async function getOwnedNote(id: string, userId: string) {
   const note = await prisma.note.findUnique({ where: { id } });
@@ -52,6 +53,7 @@ export async function PATCH(
 
     if (typeof body.title === "string") data.title = body.title.trim() || "Nota sem título";
     if (body.folderId === null || typeof body.folderId === "string") data.folderId = body.folderId;
+    if (isNoteType(body.type)) data.type = body.type;
 
     let contentDoc: TiptapDoc | undefined;
     if (body.content !== undefined) {

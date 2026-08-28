@@ -2,6 +2,15 @@ import type { TiptapDoc } from "@/lib/doc-utils";
 
 export type Flashcard = {
   id: string;
+  /**
+   * Identificador estável do card dentro da nota — usado pra guardar o
+   * estado de repetição espaçada (FlashcardReview). Vem do attrs.id do
+   * bloco de flashcard (persiste mesmo se a pergunta mudar); pra sintaxe
+   * legada em texto, que não tem onde guardar um id, cai pra um fallback
+   * baseado na própria pergunta (então editar a pergunta reinicia a revisão
+   * desses casos — limitação aceitável, é sintaxe antiga).
+   */
+  key: string;
   question: string;
   /** Uma resposta = flashcard simples. Mais de uma = flashcard de múltiplas respostas. */
   answers: string[];
@@ -24,6 +33,10 @@ function splitOnce(text: string, sep: string): [string, string] | null {
   const idx = text.indexOf(sep);
   if (idx === -1) return null;
   return [text.slice(0, idx), text.slice(idx + sep.length)];
+}
+
+function keyFor(question: string, blockId?: unknown): string {
+  return typeof blockId === "string" && blockId ? `id:${blockId}` : `q:${question}`;
 }
 
 /**
@@ -50,7 +63,7 @@ export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[
           .map((a) => String(a).trim())
           .filter(Boolean);
         if (question && answers.length > 0) {
-          cards.push({ id: nextId(), question, answers });
+          cards.push({ id: nextId(), key: keyFor(question, node.attrs?.id), question, answers });
         }
         lastWasMultiQuestion = null;
         continue;
@@ -66,7 +79,10 @@ export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[
           lastWasMultiQuestion = text.slice(0, -2).trim() || null;
         } else if (text.includes(">>")) {
           const pair = splitOnce(text, ">>");
-          if (pair) cards.push({ id: nextId(), question: pair[0].trim(), answers: [pair[1].trim()] });
+          if (pair) {
+            const question = pair[0].trim();
+            cards.push({ id: nextId(), key: keyFor(question), question, answers: [pair[1].trim()] });
+          }
         }
         continue;
       }
@@ -86,13 +102,14 @@ export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[
           const pair = splitOnce(itemText, ">>");
           if (pair) {
             answers.push(itemText);
-            cards.push({ id: nextId(), question: pair[0].trim(), answers: [pair[1].trim()] });
+            const itemQuestion = pair[0].trim();
+            cards.push({ id: nextId(), key: keyFor(itemQuestion), question: itemQuestion, answers: [pair[1].trim()] });
           } else {
             answers.push(itemText);
           }
         }
 
-        if (answers.length > 0) cards.push({ id: nextId(), question, answers });
+        if (answers.length > 0) cards.push({ id: nextId(), key: keyFor(question), question, answers });
         continue;
       }
 

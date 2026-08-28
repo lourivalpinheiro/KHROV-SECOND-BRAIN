@@ -29,6 +29,8 @@ import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
 import { NoteFolderSelect } from "./note-folder-select";
+import { NoteTypeSelect } from "./note-type-select";
+import { NOTE_TYPE_META, type NoteTypeValue } from "@/lib/note-types";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,6 +67,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [folderId, setFolderId] = useState<string | null>(null);
+  const [noteType, setNoteType] = useState<NoteTypeValue>("FLEETING");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [flashcardCount, setFlashcardCount] = useState(0);
@@ -106,7 +109,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     editorProps: {
       attributes: {
         class:
-          "prose prose-neutral dark:prose-invert max-w-none min-h-[50vh] focus:outline-none px-1 py-4",
+          "prose prose-neutral dark:prose-invert max-w-none min-h-[50vh] focus:outline-none px-3 py-4",
       },
     },
     onUpdate: ({ editor }) => {
@@ -152,6 +155,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setTitle(note.title);
     setTags(note.tags.map((t) => t.tag.name));
     setFolderId(note.folderId);
+    setNoteType(note.type);
     setFlashcardCount(extractFlashcards(note.content).length);
     // Adiado para fora do commit do efeito: evita o aviso do React sobre
     // flushSync sendo chamado durante uma renderização em andamento.
@@ -184,6 +188,21 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       setSaveState("saved");
     } catch {
       toast.error("Erro ao mover a nota.");
+    }
+  }
+
+  async function updateNoteType(newType: NoteTypeValue) {
+    const previous = noteType;
+    setNoteType(newType);
+    setSaveState("saving");
+    try {
+      await patchJSON(key, { type: newType });
+      await mutate("/api/notes");
+      setSaveState("saved");
+      toast.success(`Nota movida para "${NOTE_TYPE_META[newType].label}".`);
+    } catch {
+      setNoteType(previous);
+      toast.error("Erro ao mudar o estágio da nota.");
     }
   }
 
@@ -272,6 +291,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <NoteTypeSelect value={noteType} onChange={updateNoteType} />
           <NoteFolderSelect value={folderId} onChange={updateFolder} />
           <NoteTagInput value={tags} onChange={updateTags} />
         </div>

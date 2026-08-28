@@ -15,6 +15,7 @@ export type NoteListItem = {
   id: string;
   title: string;
   plainText: string;
+  type: "FLEETING" | "LITERATURE" | "PERMANENT";
   folderId: string | null;
   folder?: FolderDTO | null;
   updatedAt: string;

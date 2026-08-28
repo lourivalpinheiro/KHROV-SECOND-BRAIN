@@ -16,10 +16,23 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  folders     Folder[]
-  notes       Note[]
-  tags        Tag[]
-  attachments Attachment[]
+  folders          Folder[]
+  notes            Note[]
+  tags             Tag[]
+  attachments      Attachment[]
+  flashcardReviews FlashcardReview[]
+}
+
+/**
+ * Estágio de maturidade da nota, inspirado no método Zettelkasten:
+ * a nota nasce como captura rápida (FLEETING) e é "promovida" conforme
+ * amadurece — primeiro pra algo ancorado numa fonte (LITERATURE), depois
+ * pra uma ideia atômica e conectada, em texto próprio (PERMANENT).
+ */
+enum NoteType {
+  FLEETING
+  LITERATURE
+  PERMANENT
 }
 
 model Folder {
@@ -39,16 +52,21 @@ model Folder {
 }
 
 model Note {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   content   Json
-  plainText String   @default("")
+  plainText String    @default("")
+  type      NoteType  @default(FLEETING)
+  /**
+   * Preenchido só pras notas diárias (uma por dia por usuário); null pro resto.
+   */
+  dailyDate DateTime? @db.Date
   folderId  String?
-  folder    Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   tags        NoteTag[]
   attachments Attachment[]
@@ -56,15 +74,18 @@ model Note {
   linksOut NoteLink[] @relation("SourceNote")
   linksIn  NoteLink[] @relation("TargetNote")
 
+  flashcardReviews FlashcardReview[]
+
+  @@unique([userId, dailyDate])
   @@index([userId])
   @@index([folderId])
 }
 
 model Tag {
-  id     String @id @default(cuid())
+  id     String    @id @default(cuid())
   name   String
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   notes  NoteTag[]
 
   @@unique([userId, name])
@@ -74,8 +95,8 @@ model Tag {
 model NoteTag {
   noteId String
   tagId  String
-  note   Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([noteId, tagId])
   @@index([tagId])
@@ -106,4 +127,30 @@ model Attachment {
 
   @@index([noteId])
   @@index([userId])
+}
+
+/**
+ * Estado de repetição espaçada (SM-2 simplificado) de UM flashcard dentro de
+ * uma nota. `cardKey` é o identificador estável do card — o attrs.id do bloco
+ * de flashcard, ou (pra sintaxe legada "Pergunta >> Resposta", que não tem
+ * onde guardar um id) um hash da pergunta. Sem linha aqui = card nunca
+ * revisado = já está "devido" pra revisão.
+ */
+model FlashcardReview {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId         String
+  note           Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  cardKey        String
+  easeFactor     Float     @default(2.5)
+  intervalDays   Int       @default(0)
+  repetitions    Int       @default(0)
+  dueAt          DateTime  @default(now())
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([noteId, cardKey])
+  @@index([userId, dueAt])
 }

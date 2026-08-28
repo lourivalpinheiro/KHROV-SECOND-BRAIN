@@ -25,6 +25,10 @@ export const Flashcard = Node.create({
 
   addAttributes() {
     return {
+      // Id estável do card, gerado uma vez na criação — é o que liga esse
+      // flashcard ao estado de repetição espaçada dele (FlashcardReview),
+      // mesmo que a pergunta seja editada depois ou o bloco seja movido.
+      id: { default: null },
       question: { default: "" },
       answers: { default: [""] },
     };
@@ -55,7 +59,10 @@ export const Flashcard = Node.create({
         () =>
         ({ chain }) =>
           chain()
-            .insertContent({ type: this.name, attrs: { question: "", answers: [""] } })
+            .insertContent({
+              type: this.name,
+              attrs: { id: crypto.randomUUID(), question: "", answers: [""] },
+            })
             .run(),
     };
   },

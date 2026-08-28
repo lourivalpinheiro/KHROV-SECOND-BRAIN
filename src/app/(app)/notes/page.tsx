@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NotesFilterBar } from "@/components/notes-filter-bar";
 import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
+import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -116,53 +117,86 @@ export default function NotesPage() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {notes?.map((note) => (
-            <div
-              key={note.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => router.push(`/notes/${note.id}`)}
-              onKeyDown={(e) => e.key === "Enter" && router.push(`/notes/${note.id}`)}
-              className="group/note-card flex flex-col gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/40"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="line-clamp-1 font-medium">{note.title || "Nota sem título"}</h2>
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="text-xs text-muted-foreground">{formatDate(note.updatedAt)}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => removeNote(e, note)}
-                    title="Excluir nota"
-                    className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/note-card:opacity-100"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+        <div className="space-y-8">
+          {NOTE_TYPES.map((type) => {
+            const group = notes?.filter((n) => n.type === type) ?? [];
+            if (group.length === 0) return null;
+            const meta = NOTE_TYPE_META[type];
+            const Icon = meta.icon;
+            return (
+              <section key={type}>
+                <div className="mb-3 flex items-center gap-2">
+                  <Icon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold tracking-tight">{meta.label}</h2>
+                  <span className="text-xs text-muted-foreground">{group.length}</span>
                 </div>
-              </div>
-              {note.plainText && (
-                <p className="line-clamp-2 text-sm text-muted-foreground">{note.plainText}</p>
-              )}
-              {(note.folder || note.tags.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1 pt-1">
-                  {note.folder && (
-                    <Badge variant="outline" className="gap-1 text-[11px] text-muted-foreground">
-                      <Folder className="size-3" />
-                      {note.folder.name}
-                    </Badge>
-                  )}
-                  {note.tags.map(({ tag }) => (
-                    <Badge key={tag.id} variant="secondary" className="text-[11px]">
-                      {tag.name}
-                    </Badge>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {group.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      onOpen={() => router.push(`/notes/${note.id}`)}
+                      onRemove={(e) => removeNote(e, note)}
+                    />
                   ))}
                 </div>
-              )}
-            </div>
-          ))}
+              </section>
+            );
+          })}
         </div>
       </div>
       {ConfirmDialog}
     </ScrollArea>
+  );
+}
+
+function NoteCard({
+  note,
+  onOpen,
+  onRemove,
+}: {
+  note: NoteListItem;
+  onOpen: () => void;
+  onRemove: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => e.key === "Enter" && onOpen()}
+      className="group/note-card flex flex-col gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/40"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="line-clamp-1 font-medium">{note.title || "Nota sem título"}</h3>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-muted-foreground">{formatDate(note.updatedAt)}</span>
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Excluir nota"
+            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/note-card:opacity-100"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      </div>
+      {note.plainText && <p className="line-clamp-2 text-sm text-muted-foreground">{note.plainText}</p>}
+      {(note.folder || note.tags.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1 pt-1">
+          {note.folder && (
+            <Badge variant="outline" className="gap-1 text-[11px] text-muted-foreground">
+              <Folder className="size-3" />
+              {note.folder.name}
+            </Badge>
+          )}
+          {note.tags.map(({ tag }) => (
+            <Badge key={tag.id} variant="secondary" className="text-[11px]">
+              {tag.name}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

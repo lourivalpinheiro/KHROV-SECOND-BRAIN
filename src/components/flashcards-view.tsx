@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Layers, Shuffle } from "lucide-react";
-import { fetcher } from "@/lib/api-client";
+import { ChevronLeft, ChevronRight, Layers, Shuffle, X, Meh, Check, CalendarClock } from "lucide-react";
+import { fetcher, postJSON } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
+import { isDue, type ReviewGrade } from "@/lib/spaced-repetition";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import {
   Select,
   SelectContent,
@@ -13,16 +16,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 type FlashcardDTO = {
   id: string;
   noteId: string;
+  cardKey: string;
   noteTitle: string;
   question: string;
   answers: string[];
   folderId: string | null;
   folderName: string | null;
   tags: { id: string; name: string }[];
+  dueAt: string | null;
+  repetitions: number;
 };
 
 const ALL = "__all__";
@@ -41,9 +48,13 @@ export function FlashcardsView() {
   const [noteFilter, setNoteFilter] = useState(ALL);
   const [folderFilter, setFolderFilter] = useState(ALL);
   const [tagFilter, setTagFilter] = useState(ALL);
+  const [dueOnly, setDueOnly] = useState(true);
   const [order, setOrder] = useState<FlashcardDTO[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
+  // Quantas respostas já foram reveladas do card atual — em cards de resposta
+  // única funciona como um boolean (0 ou 1); em cards com várias respostas,
+  // cada clique revela mais uma, na ordem.
+  const [revealedCount, setRevealedCount] = useState(0);
 
   const notesWithCards = useMemo(() => {
     const map = new Map<string, string>();
@@ -72,24 +83,44 @@ export function FlashcardsView() {
     );
   }, [allCards, noteFilter, folderFilter, tagFilter]);
 
-  const deck = order ?? filtered;
+  const dueFiltered = useMemo(() => filtered.filter((c) => isDue(c.dueAt)), [filtered]);
+  const baseDeck = dueOnly ? dueFiltered : filtered;
+  const deck = order ?? baseDeck;
   const current = deck[index];
+  const isRevealed = !!current && revealedCount >= current.answers.length;
 
   function resetDeck() {
     setOrder(null);
     setIndex(0);
-    setRevealed(false);
+    setRevealedCount(0);
   }
 
   function shuffleDeck() {
-    setOrder(shuffle(filtered));
+    setOrder(shuffle(baseDeck));
     setIndex(0);
-    setRevealed(false);
+    setRevealedCount(0);
   }
 
   function go(delta: number) {
-    setRevealed(false);
+    setRevealedCount(0);
     setIndex((i) => Math.min(Math.max(i + delta, 0), deck.length - 1));
+  }
+
+  function revealNext() {
+    const total = current?.answers.length ?? 0;
+    // Depois de revelar tudo, o próximo clique recomeça (esconde de novo).
+    setRevealedCount((c) => (c >= total ? 0 : c + 1));
+  }
+
+  async function grade(g: ReviewGrade) {
+    if (!current) return;
+    try {
+      await postJSON("/api/flashcards/review", { noteId: current.noteId, cardKey: current.cardKey, grade: g });
+      await mutate("/api/flashcards");
+    } catch {
+      toast.error("Erro ao registrar a revisão.");
+    }
+    go(1);
   }
 
   if (isLoading) {
@@ -189,6 +220,18 @@ export function FlashcardsView() {
           <Shuffle className="size-3.5" /> Embaralhar
         </Button>
 
+        <Toggle
+          size="sm"
+          className="h-8 gap-1.5 data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
+          pressed={dueOnly}
+          onPressedChange={(v) => {
+            setDueOnly(v);
+            resetDeck();
+          }}
+        >
+          <CalendarClock className="size-3.5" /> Só devidas ({dueFiltered.length})
+        </Toggle>
+
         <span className="ml-auto text-sm text-muted-foreground">
           {deck.length > 0 ? `${index + 1} / ${deck.length}` : "0 / 0"}
         </span>
@@ -198,26 +241,47 @@ export function FlashcardsView() {
         <div
           role="button"
           tabIndex={0}
-          onClick={() => setRevealed((r) => !r)}
-          onKeyDown={(e) => e.key === "Enter" && setRevealed((r) => !r)}
+          onClick={revealNext}
+          onKeyDown={(e) => e.key === "Enter" && revealNext()}
           className="flex min-h-72 flex-1 cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border bg-card p-8 text-center shadow-xs transition-colors hover:border-primary/40"
         >
           <span className="text-xs text-muted-foreground">{current.noteTitle}</span>
           <p className="text-lg font-medium">{current.question}</p>
 
-          {revealed ? (
-            current.answers.length > 1 ? (
-              <ul className="space-y-1 text-muted-foreground">
-                {current.answers.map((a, i) => (
-                  <li key={i}>{a}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">{current.answers[0]}</p>
-            )
-          ) : (
-            <span className="text-xs text-muted-foreground">Clique para revelar a resposta</span>
-          )}
+          {current.answers.length > 1 ? (
+            <ul className="w-full max-w-sm space-y-1.5">
+              {current.answers.map((a, i) => {
+                const isRevealed = i < revealedCount;
+                return (
+                  <li
+                    key={i}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                      isRevealed
+                        ? "border-transparent bg-muted text-foreground"
+                        : "border-dashed text-muted-foreground/40"
+                    )}
+                  >
+                    {isRevealed ? a : "· · ·"}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : revealedCount > 0 ? (
+            <p className="text-muted-foreground">{current.answers[0]}</p>
+          ) : null}
+
+          <span className="text-xs text-muted-foreground">
+            {current.answers.length > 1
+              ? revealedCount === 0
+                ? `Clique para revelar a 1ª resposta (${current.answers.length} no total)`
+                : revealedCount < current.answers.length
+                  ? `Clique para revelar a próxima (${revealedCount}/${current.answers.length})`
+                  : "Clique para esconder e recomeçar"
+              : revealedCount === 0
+                ? "Clique para revelar a resposta"
+                : "Clique para esconder"}
+          </span>
 
           <Link
             href={`/notes/${current.noteId}`}
@@ -227,9 +291,31 @@ export function FlashcardsView() {
             Abrir nota
           </Link>
         </div>
+      ) : dueOnly && filtered.length > 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+          <Check className="size-8 text-primary" />
+          <p>Tudo revisado por aqui! Nenhum flashcard devido agora.</p>
+          <Button variant="outline" size="sm" onClick={() => { setDueOnly(false); resetDeck(); }}>
+            Ver todos os {filtered.length}
+          </Button>
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center text-muted-foreground">
           Nenhum flashcard para essa seleção.
+        </div>
+      )}
+
+      {current && isRevealed && (
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => grade("AGAIN")}>
+            <X /> Errei
+          </Button>
+          <Button variant="outline" onClick={() => grade("HARD")}>
+            <Meh /> Difícil
+          </Button>
+          <Button variant="outline" className="border-primary/40 text-primary hover:bg-primary/10" onClick={() => grade("EASY")}>
+            <Check /> Fácil
+          </Button>
         </div>
       )}
 

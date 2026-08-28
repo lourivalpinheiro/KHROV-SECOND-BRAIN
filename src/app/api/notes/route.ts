@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 import { EMPTY_DOC } from "@/lib/doc-utils";
+import { isNoteType } from "@/lib/note-types";
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,12 +61,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Nota sem título";
     const folderId = typeof body.folderId === "string" ? body.folderId : null;
+    const type = isNoteType(body.type) ? body.type : "FLEETING";
 
     const note = await prisma.note.create({
       data: {
         title,
         content: EMPTY_DOC as unknown as Prisma.InputJsonValue,
         plainText: "",
+        type,
         folderId,
         userId,
       },
