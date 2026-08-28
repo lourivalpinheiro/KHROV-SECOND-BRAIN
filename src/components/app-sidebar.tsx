@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { BrainCircuit, FileText, Layers, Network, Plus, Search } from "lucide-react";
+import { BrainCircuit, CalendarDays, FileText, Layers, Network, Plus, Search } from "lucide-react";
 import { postJSON } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,7 @@ export function AppSidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const [openingDaily, setOpeningDaily] = useState(false);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
 
   async function createNote() {
@@ -40,6 +41,22 @@ export function AppSidebar({
       toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function openDailyNote() {
+    setOpeningDaily(true);
+    try {
+      // Data local do usuário (não a do servidor) — pra "hoje" bater com o
+      // relógio de quem está usando o app, não com o fuso da Vercel.
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const note = await postJSON<{ id: string }>("/api/notes/daily", { date });
+      router.push(`/notes/${note.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao abrir a nota do dia.");
+    } finally {
+      setOpeningDaily(false);
     }
   }
 
@@ -89,6 +106,11 @@ export function AppSidebar({
         </SidebarMenu>
 
         <SidebarMenu className="gap-1 px-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={openDailyNote} disabled={openingDaily} tooltip="Nota de hoje">
+              <CalendarDays /> Nota de hoje
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={pathname === "/notes" && !searchParams.get("folder") && !searchParams.get("tag")}

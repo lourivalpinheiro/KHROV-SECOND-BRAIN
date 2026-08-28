@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Camera, KeyRound, Loader2, User as UserIcon } from "lucide-react";
+import { Camera, Download, KeyRound, Loader2, User as UserIcon } from "lucide-react";
 import { fetcher, patchJSON, postJSON } from "@/lib/api-client";
 import { fileToSquareDataUrl } from "@/lib/image-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -200,6 +200,22 @@ export function ProfileForm() {
           >
             {savingPassword && <Loader2 className="size-4 animate-spin" />}
             Atualizar senha
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Download className="size-4" /> Backup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Baixe todas as suas notas, pastas e tags num arquivo JSON — pra não depender só do banco em produção.
+          </p>
+          <Button variant="outline" render={<a href="/api/export" download />}>
+            <Download className="size-4" /> Baixar backup completo
           </Button>
         </CardContent>
       </Card>
