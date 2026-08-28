@@ -177,7 +177,7 @@ function NoteCard({
             type="button"
             onClick={onRemove}
             title="Excluir nota"
-            className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/note-card:opacity-100"
+            className="rounded-md p-1 text-muted-foreground opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive pointer-fine:opacity-0 pointer-fine:group-hover/note-card:opacity-100"
           >
             <Trash2 className="size-3.5" />
           </button>

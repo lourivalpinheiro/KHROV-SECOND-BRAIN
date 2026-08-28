@@ -145,7 +145,7 @@ export function FolderTree() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-6 shrink-0 opacity-0 group-hover/folder:opacity-100 group-data-[collapsible=icon]:hidden"
+                  className="size-6 shrink-0 opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover/folder:opacity-100 group-data-[collapsible=icon]:hidden"
                 >
                   <MoreHorizontal className="size-3.5" />
                 </Button>

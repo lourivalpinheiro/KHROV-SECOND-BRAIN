@@ -194,6 +194,10 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          // Sem isso, o foco ia por padrão pro primeiro elemento focável (o
+          // campo de busca no topo), abrindo o teclado assim que a sidebar
+          // abre no celular — mesmo o usuário só querendo navegar.
+          initialFocus={false}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
