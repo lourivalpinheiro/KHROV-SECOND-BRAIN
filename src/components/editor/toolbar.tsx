@@ -82,7 +82,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b bg-background/60 px-2 py-1.5">
+    <div className="flex items-center gap-0.5 overflow-x-auto border-b bg-background/60 px-2 py-1.5 [&>*]:shrink-0">
       <Item label="Negrito" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
         <Bold />
       </Item>
