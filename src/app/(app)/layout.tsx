@@ -4,12 +4,14 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HeaderUserMenu } from "@/components/header-user-menu";
+import { CommandPalette } from "@/components/command-palette";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
   return (
     <SidebarProvider>
+      <CommandPalette />
       <AppSidebar
         user={{
           name: session?.user?.name,

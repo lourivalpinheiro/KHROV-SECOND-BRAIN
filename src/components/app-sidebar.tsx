@@ -88,6 +88,9 @@ export function AppSidebar({
             placeholder="Buscar notas..."
             className="pl-7"
           />
+          <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+            ⌘K
+          </kbd>
         </form>
       </SidebarHeader>
 
