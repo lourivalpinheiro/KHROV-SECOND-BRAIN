@@ -1,5 +1,12 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import { authConfig } from "@/auth.config";
+
+// Instância separada (sem o provider de Credentials/Prisma) só pra checar a
+// sessão no middleware — mantém o bundle da Edge Function pequeno o
+// suficiente pro limite de 1MB da Vercel. A instância completa, com login
+// de verdade, é a de src/auth.ts (usada nas rotas de API/Server Components).
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
