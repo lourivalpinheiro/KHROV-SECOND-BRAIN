@@ -15,7 +15,7 @@ export const NOTE_TYPE_META: Record<
   { label: string; description: string; icon: LucideIcon }
 > = {
   FLEETING: {
-    label: "Insights",
+    label: "Pílulas",
     description: "Captura rápida, ainda crua — o primeiro registro de um pensamento.",
     icon: Lightbulb,
   },
