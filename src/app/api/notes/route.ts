@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     const userId = await requireUserId();
     const { searchParams } = new URL(req.url);
     const folderId = searchParams.get("folderId");
+    const folderIds = searchParams.get("folderIds")?.split(",").filter(Boolean) ?? [];
     const tagId = searchParams.get("tagId");
     const tagIds = searchParams.get("tagIds")?.split(",").filter(Boolean) ?? [];
     const q = searchParams.get("q");
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
     const types = (searchParams.get("types")?.split(",").filter(isNoteType) ?? []) as NoteTypeValue[];
 
     const allTagIds = tagId ? [tagId, ...tagIds] : tagIds;
+    const allFolderIds = Array.from(new Set(folderId ? [folderId, ...folderIds] : folderIds));
 
     let updatedAt: Prisma.DateTimeFilter | undefined;
     if (from || to) {
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
     const notes = await prisma.note.findMany({
       where: {
         userId,
-        ...(folderId ? { folderId } : {}),
+        ...(allFolderIds.length ? { folderId: { in: allFolderIds } } : {}),
         ...(types.length ? { type: { in: types } } : {}),
         // exige que a nota tenha TODAS as tags selecionadas
         ...(allTagIds.length ? { AND: allTagIds.map((id) => ({ tags: { some: { tagId: id } } })) } : {}),

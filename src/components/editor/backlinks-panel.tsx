@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { CornerUpLeft } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 
 type Backlink = { id: string; title: string; updatedAt: string };
@@ -15,7 +15,7 @@ export function BacklinksPanel({ noteId }: { noteId: string }) {
   return (
     <div className="space-y-2 border-t pt-4">
       <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <CornerUpLeft className="size-3.5" /> Notas que linkam para esta ({backlinks.length})
+        <Link2 className="size-3.5" /> Notas que linkam para esta ({backlinks.length})
       </h3>
       <ul className="space-y-1">
         {backlinks.map((b) => (

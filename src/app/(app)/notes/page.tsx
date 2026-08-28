@@ -28,6 +28,7 @@ export default function NotesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const searchParams = useSearchParams();
   const folderId = searchParams.get("folder");
+  const folderIds = searchParams.get("folders");
   const tagId = searchParams.get("tag");
   const tagIds = searchParams.get("tags");
   const q = searchParams.get("q");
@@ -38,6 +39,7 @@ export default function NotesPage() {
   const query = useMemo(() => {
     const params = new URLSearchParams();
     if (folderId) params.set("folderId", folderId);
+    if (folderIds) params.set("folderIds", folderIds);
     if (tagId) params.set("tagId", tagId);
     if (tagIds) params.set("tagIds", tagIds);
     if (q) params.set("q", q);
@@ -46,7 +48,7 @@ export default function NotesPage() {
     if (types) params.set("types", types);
     const qs = params.toString();
     return `/api/notes${qs ? `?${qs}` : ""}`;
-  }, [folderId, tagId, tagIds, q, from, to, types]);
+  }, [folderId, folderIds, tagId, tagIds, q, from, to, types]);
 
   const { data: notes, isLoading } = useSWR<NoteListItem[]>(query, fetcher);
   const { data: folders } = useSWR<FolderDTO[]>(folderId ? "/api/folders" : null, fetcher);

@@ -60,7 +60,15 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        <Command>{children}</Command>
+        {/*
+          shouldFilter=false: o CommandInput aqui é sempre controlado (value +
+          onValueChange) porque quem usa esse CommandDialog faz a própria
+          busca (server-side, ou array.filter local) — sem isso, o cmdk
+          tentava filtrar de novo por conta própria usando o `value` de cada
+          item (que muitas vezes é um id opaco tipo "note-abc123", não o
+          título visível), escondendo tudo que não batesse com o texto digitado.
+        */}
+        <Command shouldFilter={false}>{children}</Command>
       </DialogContent>
     </Dialog>
   )
@@ -156,7 +164,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "group/command-item relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:bg-accent hover:text-accent-foreground data-selected:bg-accent data-selected:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:*:[svg]:text-accent-foreground data-selected:*:[svg]:text-accent-foreground",
         className
       )}
       {...props}
