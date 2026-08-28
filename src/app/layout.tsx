@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthSessionProvider } from "@/components/auth-session-provider";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 
 const changa = Changa({
   variable: "--font-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <ServiceWorkerRegister />
         <AuthSessionProvider>
           <ThemeProvider>
             <TooltipProvider delay={200}>

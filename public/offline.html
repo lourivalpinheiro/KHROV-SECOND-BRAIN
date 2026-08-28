@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thought Chain — offline</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0a0a0a;
+        --fg: #fafafa;
+        --muted: #a1a1aa;
+        --primary: #2563eb;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff;
+          --fg: #0a0a0a;
+          --muted: #71717a;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2rem;
+        text-align: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .badge {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .badge svg { width: 28px; height: 28px; color: #fff; }
+      h1 { font-size: 1.25rem; margin: 0; }
+      p { margin: 0; color: var(--muted); max-width: 26rem; }
+      button {
+        margin-top: 0.5rem;
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+        background: transparent;
+        color: var(--fg);
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+      button:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+    </style>
+  </head>
+  <body>
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+        <path d="M9 13a4.5 4.5 0 0 0 3-4" />
+        <path d="M12 13h4" />
+        <path d="M12 18h6a2 2 0 0 1 2 2v1" />
+        <path d="M12 8h8" />
+      </svg>
+    </div>
+    <h1>Você está offline</h1>
+    <p>Essa página ainda não foi salva pra leitura offline. Notas já abertas antes continuam disponíveis.</p>
+    <button onclick="location.reload()">Tentar de novo</button>
+  </body>
+</html>
