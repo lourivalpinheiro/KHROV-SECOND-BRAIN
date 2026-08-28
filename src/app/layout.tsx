@@ -19,11 +19,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Thought Chain",
-  description: "Seu second brain pessoal — notas conectadas, tags e pastas.",
+  title: "Khrov",
+  description: "Second Brain — notas conectadas, tags e pastas.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
-    title: "Thought Chain",
+    title: "Khrov",
     statusBarStyle: "default",
   },
 };

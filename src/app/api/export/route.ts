@@ -44,7 +44,7 @@ export async function GET() {
       })),
     };
 
-    const filename = `thought-chain-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const filename = `khrov-backup-${new Date().toISOString().slice(0, 10)}.json`;
 
     return new NextResponse(JSON.stringify(payload, null, 2), {
       headers: {

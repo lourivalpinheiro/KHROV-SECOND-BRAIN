@@ -38,9 +38,9 @@ export default async function LoginPage({
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <BrainCircuit className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-semibold">Thought Chain</h1>
+          <h1 className="text-2xl font-semibold">Khrov</h1>
           <p className="text-sm text-muted-foreground">
-            Seu second brain pessoal. Entre para continuar.
+            Second Brain. Entre para continuar.
           </p>
         </div>
 

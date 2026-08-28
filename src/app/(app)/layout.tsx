@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <span className="hidden text-sm text-muted-foreground sm:inline">
-            Seu second brain pessoal
+            Second Brain
           </span>
           <ThemeToggle className="ml-auto" />
           <HeaderUserMenu

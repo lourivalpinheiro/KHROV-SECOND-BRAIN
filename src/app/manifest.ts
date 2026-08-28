@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Thought Chain",
-    short_name: "Thought Chain",
-    description: "Seu second brain pessoal — notas conectadas, tags e pastas.",
+    name: "Khrov",
+    short_name: "Khrov",
+    description: "Second Brain — notas conectadas, tags e pastas.",
     start_url: "/",
     display: "standalone",
     background_color: "#0a0a0a",

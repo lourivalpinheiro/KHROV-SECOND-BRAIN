@@ -1,10 +1,10 @@
-// Service worker do Thought Chain — cache pra ler notas já visitadas offline.
+// Service worker do Khrov — cache pra ler notas já visitadas offline.
 // Escopo deliberadamente pequeno: só leitura (GET). Criar/editar/excluir
 // nota exige rede, do jeito que já era (o navegador acusa erro normalmente).
 //
 // Bump nessa versão sempre que a lógica de cache abaixo mudar, pra forçar
 // os clientes a trocarem de cache em vez de ficarem presos no antigo.
-const CACHE_NAME = "thought-chain-v1";
+const CACHE_NAME = "khrov-v1";
 
 const APP_SHELL = ["/offline.html", "/icon.png", "/apple-icon.png", "/manifest.webmanifest"];
 

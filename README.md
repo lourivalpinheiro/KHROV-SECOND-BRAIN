@@ -1,6 +1,6 @@
-# Thought Chain
+# Khrov
 
-Second brain pessoal — notas conectadas por wikilinks (`[[`), tags, pastas, editor rico, anexos, grafo de notas e flashcards. Inspirado no método PARA de Tiago Forte.
+Second Brain — notas conectadas por wikilinks (`[[`), tags, pastas, editor rico, anexos, grafo de notas e flashcards. Inspirado no método PARA de Tiago Forte.
 
 ## Stack
 

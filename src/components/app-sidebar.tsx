@@ -73,7 +73,7 @@ export function AppSidebar({
             <BrainCircuit className="size-4" />
           </div>
           <span className="truncate font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-            Thought Chain
+            Khrov
           </span>
         </div>
 
