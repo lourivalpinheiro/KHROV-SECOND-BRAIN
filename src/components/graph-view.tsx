@@ -13,7 +13,8 @@ import {
   type SimulationLinkDatum,
 } from "d3-force";
 import { fetcher } from "@/lib/api-client";
-import { Network } from "lucide-react";
+import { Network, Plus, Minus, Maximize } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type GraphNode = SimulationNodeDatum & { id: string; title: string; folderId: string | null };
 type GraphLink = SimulationLinkDatum<GraphNode>;
@@ -22,6 +23,12 @@ type Point = { x: number; y: number };
 
 const WIDTH = 1000;
 const HEIGHT = 700;
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 2.5;
+
+function distance(a: Point, b: Point) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
 
 export function GraphView() {
   const { data, isLoading } = useSWR<GraphData>("/api/graph", fetcher);
@@ -33,6 +40,8 @@ export function GraphView() {
   const panState = useRef<Point | null>(null);
   const dragNodeId = useRef<string | null>(null);
   const dragMoved = useRef(false);
+  const activePointers = useRef<Map<number, Point>>(new Map());
+  const pinchStart = useRef<{ dist: number; k: number } | null>(null);
 
   const layout = useMemo(() => {
     if (!data || data.nodes.length === 0) return null;
@@ -78,10 +87,18 @@ export function GraphView() {
     return positions[n.id] ?? { x: n.x ?? 0, y: n.y ?? 0 };
   }
 
+  function zoomBy(factor: number) {
+    setTransform((t) => ({ ...t, k: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, t.k * factor)) }));
+  }
+
+  function resetZoom() {
+    setTransform({ x: 0, y: 0, k: 1 });
+  }
+
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     const delta = -e.deltaY * 0.001;
-    setTransform((t) => ({ ...t, k: Math.min(2.5, Math.max(0.3, t.k + delta)) }));
+    setTransform((t) => ({ ...t, k: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, t.k + delta)) }));
   }
 
   function onNodePointerDown(e: React.PointerEvent, id: string) {
@@ -93,10 +110,30 @@ export function GraphView() {
   }
 
   function onBackgroundPointerDown(e: React.PointerEvent) {
-    panState.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.current.size === 2) {
+      // Um segundo dedo entrou em jogo: troca de pan pra pinch-zoom.
+      panState.current = null;
+      const [a, b] = [...activePointers.current.values()];
+      pinchStart.current = { dist: distance(a, b), k: transform.k };
+    } else {
+      panState.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    }
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    if (activePointers.current.has(e.pointerId)) {
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (activePointers.current.size === 2 && pinchStart.current) {
+      const [a, b] = [...activePointers.current.values()];
+      const ratio = distance(a, b) / pinchStart.current.dist;
+      const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStart.current.k * ratio));
+      setTransform((t) => ({ ...t, k }));
+      return;
+    }
+
     if (dragNodeId.current) {
       dragMoved.current = true;
       const id = dragNodeId.current;
@@ -117,7 +154,11 @@ export function GraphView() {
     setTransform((t) => ({ ...t, x: e.clientX - start.x, y: e.clientY - start.y }));
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: React.PointerEvent) {
+    activePointers.current.delete(e.pointerId);
+    if (activePointers.current.size < 2) {
+      pinchStart.current = null;
+    }
     dragNodeId.current = null;
     panState.current = null;
     setIsDragging(false);
@@ -157,7 +198,18 @@ export function GraphView() {
   }
 
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="relative flex-1 overflow-hidden">
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-0.5 rounded-lg border bg-background/90 p-1 shadow-sm backdrop-blur">
+        <Button type="button" variant="ghost" size="icon" className="size-8" title="Aumentar zoom" onClick={() => zoomBy(1.2)}>
+          <Plus />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="size-8" title="Diminuir zoom" onClick={() => zoomBy(1 / 1.2)}>
+          <Minus />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="size-8" title="Restaurar zoom" onClick={resetZoom}>
+          <Maximize />
+        </Button>
+      </div>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-full w-full cursor-grab touch-none active:cursor-grabbing"

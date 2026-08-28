@@ -34,5 +34,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Ícones e manifest precisam ficar acessíveis sem sessão — são buscados pelo
+  // navegador/SO na instalação como PWA, antes (ou independente) do login.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|icons/).*)",
+  ],
 };

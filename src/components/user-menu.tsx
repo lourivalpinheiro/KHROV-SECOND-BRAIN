@@ -22,16 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-
-function initials(name?: string | null, email?: string | null) {
-  const base = name || email || "?";
-  return base
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-}
+import { initials } from "@/lib/utils";
 
 export function UserMenu({
   name,

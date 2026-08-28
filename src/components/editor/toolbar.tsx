@@ -21,6 +21,10 @@ import {
   Layers,
   Undo2,
   Redo2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Separator } from "@/components/ui/separator";
@@ -120,6 +124,21 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       </Item>
       <Item label="Citação" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
         <Quote />
+      </Item>
+
+      <Separator orientation="vertical" className="mx-1 h-5" />
+
+      <Item label="Alinhar à esquerda" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>
+        <AlignLeft />
+      </Item>
+      <Item label="Centralizar" active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}>
+        <AlignCenter />
+      </Item>
+      <Item label="Alinhar à direita" active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()}>
+        <AlignRight />
+      </Item>
+      <Item label="Justificar" active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()}>
+        <AlignJustify />
       </Item>
 
       <Separator orientation="vertical" className="mx-1 h-5" />

@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HeaderUserMenu } from "@/components/header-user-menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -24,6 +25,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Seu second brain pessoal
           </span>
           <ThemeToggle className="ml-auto" />
+          <HeaderUserMenu
+            className="sm:hidden"
+            name={session?.user?.name}
+            email={session?.user?.email}
+            image={session?.user?.image}
+          />
         </header>
         <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </SidebarInset>

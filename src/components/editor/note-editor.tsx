@@ -15,6 +15,7 @@ import TableCell from "@tiptap/extension-table-cell";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
+import TextAlign from "@tiptap/extension-text-align";
 import { Download, Layers, Maximize2, Minimize2, MoreHorizontal, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetcher, patchJSON, deleteJSON } from "@/lib/api-client";
@@ -25,6 +26,7 @@ import { createWikiLinkExtension } from "./wiki-link-extension";
 import { FlashcardHighlight } from "./flashcard-highlight-extension";
 import { Flashcard } from "./flashcard-node";
 import { EditorToolbar } from "./toolbar";
+import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
 import { NoteFolderSelect } from "./note-folder-select";
 import { AttachmentsPanel } from "./attachments-panel";
@@ -89,6 +91,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       TableCell,
       TaskList,
       TaskItem.configure({ nested: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder: "Escreva algo... use [[ para linkar outra nota" }),
       createWikiLinkExtension(noteId),
       FlashcardHighlight,
@@ -275,6 +278,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
         <div className="rounded-lg border">
           <EditorToolbar editor={editor} />
+          <TableBubbleMenu editor={editor} />
           <EditorContent editor={editor} />
           {flashcardCount > 0 && (
             <div className="flex items-center gap-1.5 border-t px-3 py-1.5 text-xs text-muted-foreground">
