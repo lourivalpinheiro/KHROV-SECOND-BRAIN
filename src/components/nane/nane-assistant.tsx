@@ -128,13 +128,17 @@ export function NaneAssistant() {
 
   const handleAction = useCallback(
     async (action: { type: string; noteId?: string; title?: string; targetType?: string } | null) => {
-      if (!action) return;
-      if (action.type === "note_created" || action.type === "open_note") {
+      // Toda resposta sem side-effect de navegação (pergunta respondida,
+      // sugestão de nota, intenção não reconhecida) chega com action: null
+      // — precisa cair no reset de fase lá embaixo do mesmo jeito, senão
+      // fica travada em "thinking" pra sempre (bug: esse early return
+      // pulava o reset).
+      if (action?.type === "note_created" || action?.type === "open_note") {
         if (action.noteId) {
           await mutate("/api/notes");
           router.push(`/notes/${action.noteId}`);
         }
-      } else if (action.type === "confirm_promote" && action.noteId && action.title && action.targetType) {
+      } else if (action?.type === "confirm_promote" && action.noteId && action.title && action.targetType) {
         setPendingPromote({ noteId: action.noteId, title: action.title, targetType: action.targetType });
         setPhase("confirm");
         return;
