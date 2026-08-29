@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Layers, Shuffle, X, Meh, Check, CalendarClock } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -43,9 +44,14 @@ function shuffle<T>(arr: T[]): T[] {
 
 export function FlashcardsView() {
   const { data: allCards, isLoading } = useSWR<FlashcardDTO[]>("/api/flashcards", fetcher);
-  const [noteFilter, setNoteFilter] = useState(ALL);
+  const searchParams = useSearchParams();
+  // Veio de "N flashcards nesta nota" no editor: já chega filtrado pra essa
+  // nota, e sem o filtro "só devidas" — a intenção ali é estudar/revisar as
+  // desta nota agora, não esperar a data de repetição espaçada.
+  const initialNoteId = searchParams.get("noteId");
+  const [noteFilter, setNoteFilter] = useState(initialNoteId ?? ALL);
   const [tagFilter, setTagFilter] = useState(ALL);
-  const [dueOnly, setDueOnly] = useState(true);
+  const [dueOnly, setDueOnly] = useState(!initialNoteId);
   const [order, setOrder] = useState<FlashcardDTO[] | null>(null);
   const [index, setIndex] = useState(0);
   // Quantas respostas já foram reveladas do card atual — em cards de resposta

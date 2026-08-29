@@ -503,10 +503,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           <TableBubbleMenu editor={editor} />
           <EditorContent editor={editor} />
           {flashcardCount > 0 && (
-            <div className="flex items-center gap-1.5 border-t px-3 py-1.5 text-xs text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => router.push(`/flashcards?noteId=${noteId}`)}
+              className="flex w-full items-center gap-1.5 border-t px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+              title="Estudar os flashcards desta nota"
+            >
               <Layers className="size-3.5 text-primary" />
               {flashcardCount} {flashcardCount === 1 ? "flashcard" : "flashcards"} nesta nota
-            </div>
+            </button>
           )}
         </div>
 
