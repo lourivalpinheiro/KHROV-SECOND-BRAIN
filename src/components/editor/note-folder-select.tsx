@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api-client";
 import type { FolderDTO } from "@/types/models";
+import { flattenFolders } from "@/lib/folder-tree";
 import { Folder } from "lucide-react";
 import {
   Select,
@@ -13,24 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-function flatten(folders: FolderDTO[]): { id: string; label: string }[] {
-  const byParent = new Map<string | null, FolderDTO[]>();
-  for (const f of folders) {
-    const key = f.parentId;
-    if (!byParent.has(key)) byParent.set(key, []);
-    byParent.get(key)!.push(f);
-  }
-  const out: { id: string; label: string }[] = [];
-  function walk(parentId: string | null, prefix: string) {
-    for (const f of byParent.get(parentId) ?? []) {
-      out.push({ id: f.id, label: `${prefix}${f.name}` });
-      walk(f.id, `${prefix}${f.name} / `);
-    }
-  }
-  walk(null, "");
-  return out;
-}
-
 export function NoteFolderSelect({
   value,
   onChange,
@@ -39,7 +22,7 @@ export function NoteFolderSelect({
   onChange: (folderId: string | null) => void;
 }) {
   const { data: folders } = useSWR<FolderDTO[]>("/api/folders", fetcher);
-  const options = useMemo(() => flatten(folders ?? []), [folders]);
+  const options = useMemo(() => flattenFolders(folders ?? []), [folders]);
   const labelById = useMemo(() => new Map(options.map((o) => [o.id, o.label])), [options]);
 
   return (

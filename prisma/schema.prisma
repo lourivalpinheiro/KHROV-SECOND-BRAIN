@@ -35,18 +35,35 @@ enum NoteType {
   PERMANENT
 }
 
-model Folder {
-  id        String   @id @default(cuid())
-  name      String
-  parentId  String?
-  parent    Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Folder[] @relation("FolderToFolder")
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notes     Note[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/**
+ * As 4 categorias do método PARA (Tiago Forte): Projetos, Áreas, Recursos,
+ * Arquivo. Marcam as 4 pastas-raiz que todo usuário ganha automaticamente —
+ * null em qualquer outra pasta (criada livremente pelo usuário).
+ */
+enum ParaCategory {
+  PROJECTS
+  AREAS
+  RESOURCES
+  ARCHIVE
+}
 
+model Folder {
+  id           String        @id @default(cuid())
+  name         String
+  parentId     String?
+  parent       Folder?       @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Folder[]      @relation("FolderToFolder")
+  /**
+   * Só preenchido nas 4 pastas-raiz do PARA — ver enum ParaCategory.
+   */
+  paraCategory ParaCategory?
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes        Note[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, paraCategory])
   @@index([userId])
   @@index([parentId])
 }

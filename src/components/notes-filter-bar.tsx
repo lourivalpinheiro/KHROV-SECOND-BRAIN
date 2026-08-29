@@ -7,6 +7,7 @@ import { CalendarRange, Folder, Search, Tags, X, ListFilter } from "lucide-react
 import { fetcher } from "@/lib/api-client";
 import type { FolderDTO, TagDTO } from "@/types/models";
 import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
+import { flattenFolders } from "@/lib/folder-tree";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,25 +25,6 @@ function useDebounced<T>(value: T, delay: number) {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
-}
-
-/** Achata a árvore de pastas numa lista, com o caminho completo no label (ex: "Trabalho / Projetos"). */
-function flattenFolders(folders: FolderDTO[]): { id: string; label: string }[] {
-  const byParent = new Map<string | null, FolderDTO[]>();
-  for (const f of folders) {
-    const key = f.parentId;
-    if (!byParent.has(key)) byParent.set(key, []);
-    byParent.get(key)!.push(f);
-  }
-  const out: { id: string; label: string }[] = [];
-  function walk(parentId: string | null, prefix: string) {
-    for (const f of byParent.get(parentId) ?? []) {
-      out.push({ id: f.id, label: `${prefix}${f.name}` });
-      walk(f.id, `${prefix}${f.name} / `);
-    }
-  }
-  walk(null, "");
-  return out;
 }
 
 export function NotesFilterBar() {

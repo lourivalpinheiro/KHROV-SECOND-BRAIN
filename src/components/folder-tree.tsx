@@ -5,6 +5,7 @@ import useSWR, { mutate } from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Folder as FolderIcon,
+  FolderInput,
   FolderPlus,
   MoreHorizontal,
   Pencil,
@@ -12,6 +13,14 @@ import {
 } from "lucide-react";
 import { fetcher, postJSON, patchJSON, deleteJSON } from "@/lib/api-client";
 import type { FolderDTO } from "@/types/models";
+import { flattenFolders, folderAndDescendantIds } from "@/lib/folder-tree";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -51,7 +60,20 @@ type DialogState =
   | { mode: "create-root" }
   | { mode: "create-sub"; parentId: string }
   | { mode: "rename"; folder: FolderDTO }
+  | { mode: "move"; folder: FolderDTO }
   | null;
+
+const ROOT_VALUE = "__root__";
+
+/** Ordem fixa das 4 categorias do PARA; pastas sem categoria vêm depois, em ordem alfabética. */
+const PARA_ORDER: Record<string, number> = { PROJECTS: 0, AREAS: 1, RESOURCES: 2, ARCHIVE: 3 };
+function sortRoots(folders: FolderDTO[]): FolderDTO[] {
+  return [...folders].sort((a, b) => {
+    const pa = a.paraCategory ? PARA_ORDER[a.paraCategory] : 4;
+    const pb = b.paraCategory ? PARA_ORDER[b.paraCategory] : 4;
+    return pa !== pb ? pa - pb : a.name.localeCompare(b.name, "pt-BR");
+  });
+}
 
 export function FolderTree() {
   const { data: folders, isLoading } = useSWR<FolderDTO[]>("/api/folders", fetcher);
@@ -60,6 +82,7 @@ export function FolderTree() {
   const activeFolderId = searchParams.get("folder");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [name, setName] = useState("");
+  const [moveTargetId, setMoveTargetId] = useState<string>(ROOT_VALUE);
   const [pending, setPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FolderDTO | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -76,11 +99,23 @@ export function FolderTree() {
 
   function openDialog(state: DialogState) {
     setName(state && state.mode === "rename" ? state.folder.name : "");
+    setMoveTargetId(state && state.mode === "move" ? (state.folder.parentId ?? ROOT_VALUE) : ROOT_VALUE);
     setDialog(state);
   }
 
+  // Pra "mover pra": qualquer pasta, exceto a própria pasta, as subpastas
+  // dela (criaria um ciclo) e a pasta Arquivo (não pode ter subpastas).
+  const moveFolderOptions = useMemo(() => {
+    if (dialog?.mode !== "move") return [];
+    const blocked = folderAndDescendantIds(folders ?? [], dialog.folder.id);
+    return flattenFolders(
+      (folders ?? []).filter((f) => !blocked.has(f.id) && f.paraCategory !== "ARCHIVE")
+    );
+  }, [dialog, folders]);
+
   async function submitDialog() {
-    if (!dialog || !name.trim()) return;
+    if (!dialog) return;
+    if (dialog.mode !== "move" && !name.trim()) return;
     setPending(true);
     try {
       if (dialog.mode === "create-root") {
@@ -89,6 +124,10 @@ export function FolderTree() {
         await postJSON("/api/folders", { name: name.trim(), parentId: dialog.parentId });
       } else if (dialog.mode === "rename") {
         await patchJSON(`/api/folders/${dialog.folder.id}`, { name: name.trim() });
+      } else if (dialog.mode === "move") {
+        await patchJSON(`/api/folders/${dialog.folder.id}`, {
+          parentId: moveTargetId === ROOT_VALUE ? null : moveTargetId,
+        });
       }
       await mutate("/api/folders");
       setDialog(null);
@@ -152,15 +191,24 @@ export function FolderTree() {
               }
             />
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => openDialog({ mode: "create-sub", parentId: folder.id })}>
-                <FolderPlus /> Nova subpasta
-              </DropdownMenuItem>
+              {folder.paraCategory !== "ARCHIVE" && (
+                <DropdownMenuItem onClick={() => openDialog({ mode: "create-sub", parentId: folder.id })}>
+                  <FolderPlus /> Nova subpasta
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => openDialog({ mode: "rename", folder })}>
                 <Pencil /> Renomear
               </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(folder)}>
-                <Trash2 /> Excluir
-              </DropdownMenuItem>
+              {!folder.paraCategory && (
+                <DropdownMenuItem onClick={() => openDialog({ mode: "move", folder })}>
+                  <FolderInput /> Mover para...
+                </DropdownMenuItem>
+              )}
+              {!folder.paraCategory && (
+                <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(folder)}>
+                  <Trash2 /> Excluir
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -173,7 +221,7 @@ export function FolderTree() {
     );
   }
 
-  const roots = byParent.get(null) ?? [];
+  const roots = sortRoots(byParent.get(null) ?? []);
 
   return (
     <SidebarGroup>
@@ -194,22 +242,42 @@ export function FolderTree() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {dialog?.mode === "rename" ? "Renomear pasta" : "Nova pasta"}
+              {dialog?.mode === "rename"
+                ? "Renomear pasta"
+                : dialog?.mode === "move"
+                  ? `Mover "${dialog.folder.name}"`
+                  : "Nova pasta"}
             </DialogTitle>
           </DialogHeader>
-          <Input
-            autoFocus
-            placeholder="Nome da pasta"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitDialog()}
-          />
+          {dialog?.mode === "move" ? (
+            <Select value={moveTargetId} onValueChange={(v) => setMoveTargetId(v ?? ROOT_VALUE)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ROOT_VALUE}>Raiz (sem pasta-mãe)</SelectItem>
+                {moveFolderOptions.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              autoFocus
+              placeholder="Nome da pasta"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitDialog()}
+            />
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>
               Cancelar
             </Button>
-            <Button onClick={submitDialog} disabled={pending || !name.trim()}>
-              Salvar
+            <Button onClick={submitDialog} disabled={pending || (dialog?.mode !== "move" && !name.trim())}>
+              {dialog?.mode === "move" ? "Mover" : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>

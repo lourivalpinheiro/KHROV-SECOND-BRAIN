@@ -2,6 +2,8 @@ export type FolderDTO = {
   id: string;
   name: string;
   parentId: string | null;
+  /** Preenchido só nas 4 pastas-raiz do PARA (Projetos/Áreas/Recursos/Arquivo). */
+  paraCategory?: "PROJECTS" | "AREAS" | "RESOURCES" | "ARCHIVE" | null;
   _count?: { notes: number };
 };
 
