@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { generateHTML } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -19,7 +20,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Download, Layers, Maximize2, Minimize2, MoreHorizontal, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetcher, patchJSON, deleteJSON } from "@/lib/api-client";
-import { exportNoteToPdf } from "@/lib/export-pdf";
+import { exportNotesToPdf, type PdfSection } from "@/lib/export-pdf";
 import { extractFlashcards } from "@/lib/flashcards";
 import type { NoteDetail } from "@/types/models";
 import { createWikiLinkExtension } from "./wiki-link-extension";
@@ -229,9 +230,32 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     }
   }
 
-  function exportPdf() {
+  async function exportPdf() {
     if (!editor) return;
-    exportNoteToPdf(title, editor.getHTML());
+    const sections: PdfSection[] = [{ id: noteId, title, html: editor.getHTML() }];
+
+    // Só o grau 1: as notas que aparecem em "Conexões feitas" desta nota,
+    // não as conexões delas — pra não sair exportando o grafo inteiro.
+    try {
+      const backlinks = await fetcher<{
+        incoming: { id: string; title: string }[];
+        outgoing: { id: string; title: string }[];
+      }>(`/api/notes/${noteId}/backlinks`);
+      const connectedIds = new Map<string, string>();
+      for (const n of [...backlinks.outgoing, ...backlinks.incoming]) {
+        if (n.id !== noteId) connectedIds.set(n.id, n.title);
+      }
+      const connectedNotes = await Promise.all(
+        Array.from(connectedIds.keys()).map((id) => fetcher<NoteDetail>(`/api/notes/${id}`))
+      );
+      for (const n of connectedNotes) {
+        sections.push({ id: n.id, title: n.title, html: generateHTML(n.content, extensions) });
+      }
+    } catch {
+      // Se a busca das conexões falhar, exporta só a nota principal mesmo.
+    }
+
+    exportNotesToPdf(sections);
   }
 
   async function removeNote() {
