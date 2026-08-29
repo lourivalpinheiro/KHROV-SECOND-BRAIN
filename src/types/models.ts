@@ -8,7 +8,7 @@ export type NoteListItem = {
   id: string;
   title: string;
   plainText: string;
-  type: "STIMULUS" | "POTENTIATION" | "SYNAPSE" | "ENGRAM";
+  type: "CORTEX" | "STIMULUS" | "POTENTIATION" | "SYNAPSE" | "ENGRAM";
   synthesisText: string | null;
   /** Preenchida só nas notas de Sessão (Córtex) — uma por dia por usuário. */
   dailyDate: string | null;

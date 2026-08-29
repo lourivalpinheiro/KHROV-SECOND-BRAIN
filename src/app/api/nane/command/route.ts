@@ -82,6 +82,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (result.intent === "promote_note") {
+      if (result.note?.type === "CORTEX") {
+        return NextResponse.json({
+          intent: "promote_note",
+          reply: `"${result.note.title}" é um rascunho de Córtex — não faz parte do pipeline. Extraia um trecho pra virar Estímulo primeiro.`,
+          action: null,
+        });
+      }
       return NextResponse.json({
         intent: "promote_note",
         reply: result.reply,
@@ -100,6 +107,13 @@ export async function POST(req: NextRequest) {
     if (result.intent === "note_feedback") {
       if (!result.note) {
         return NextResponse.json({ intent: "note_feedback", reply: "Não achei nenhuma nota com esse nome.", action: null });
+      }
+      if (result.note.type === "CORTEX") {
+        return NextResponse.json({
+          intent: "note_feedback",
+          reply: `"${result.note.title}" é um rascunho de Córtex, fora do pipeline — extraia um trecho pra virar Estímulo e aí posso dar sugestões de estágio.`,
+          action: null,
+        });
       }
       const full = notes.find((n) => n.id === result.note!.id);
       if (!full) {
@@ -131,6 +145,7 @@ export async function POST(req: NextRequest) {
       }
 
       const tip = await suggestNoteImprovement(
+        full.title,
         full.plainText,
         linkedNotes.map((n) => n.title)
       );

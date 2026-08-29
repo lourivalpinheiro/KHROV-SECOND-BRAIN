@@ -1,19 +1,30 @@
-import { Zap, FlaskConical, Share2, Fingerprint, type LucideIcon } from "lucide-react";
+import { Brain, Zap, FlaskConical, Share2, Fingerprint, type LucideIcon } from "lucide-react";
 
 /**
  * Pipeline de maturação cognitiva da nota, inspirado em neurobiologia do
  * aprendizado: nasce como Estímulo (captura crua) e é "promovida" — cada
  * salto exige um esforço específico do usuário (trava de fricção
  * intencional), não é só arrastar.
+ *
+ * Córtex (rascunho de sessão) fica DE FORA desse array de propósito — não
+ * é um estágio do pipeline, é o que vem antes dele. Só vira Estímulo de
+ * verdade quando um trecho é extraído pra uma nota nova (ver
+ * "Extrair pra Estímulo" no editor); a nota de Córtex em si nunca é
+ * promovida.
  */
 export const NOTE_TYPES = ["STIMULUS", "POTENTIATION", "SYNAPSE", "ENGRAM"] as const;
 
-export type NoteTypeValue = (typeof NOTE_TYPES)[number];
+export type NoteTypeValue = "CORTEX" | (typeof NOTE_TYPES)[number];
 
 export const NOTE_TYPE_META: Record<
   NoteTypeValue,
   { label: string; description: string; icon: LucideIcon }
 > = {
+  CORTEX: {
+    label: "Córtex",
+    description: "Rascunho de sessão — ainda não processado, fora do pipeline.",
+    icon: Brain,
+  },
   STIMULUS: {
     label: "Estímulo",
     description: "Captura crua e rápida — o dado bruto, ainda não processado.",
@@ -36,13 +47,20 @@ export const NOTE_TYPE_META: Record<
   },
 };
 
+const ALL_NOTE_TYPES: readonly string[] = ["CORTEX", ...NOTE_TYPES];
+
 export function isNoteType(value: unknown): value is NoteTypeValue {
-  return typeof value === "string" && (NOTE_TYPES as readonly string[]).includes(value);
+  return typeof value === "string" && ALL_NOTE_TYPES.includes(value);
 }
 
-/** Próximo estágio na hierarquia, ou null se a nota já está no estágio final. */
+// Amplia pra string só pro indexOf aceitar qualquer NoteTypeValue (inclusive
+// "CORTEX", que corretamente não é encontrado — retorna -1, fora do pipeline).
+const PIPELINE_TYPES: readonly string[] = NOTE_TYPES;
+
+/** Próximo estágio na hierarquia, ou null se a nota já está no estágio final (ou fora do pipeline, ex: Córtex). */
 export function nextNoteType(type: NoteTypeValue): NoteTypeValue | null {
-  const idx = NOTE_TYPES.indexOf(type);
+  const idx = PIPELINE_TYPES.indexOf(type);
+  if (idx === -1) return null;
   return idx < NOTE_TYPES.length - 1 ? NOTE_TYPES[idx + 1] : null;
 }
 
@@ -77,8 +95,8 @@ export function checkPromotion(
   to: NoteTypeValue,
   stats: PromotionStats
 ): PromotionCheck {
-  const fromIdx = NOTE_TYPES.indexOf(from);
-  const toIdx = NOTE_TYPES.indexOf(to);
+  const fromIdx = PIPELINE_TYPES.indexOf(from);
+  const toIdx = PIPELINE_TYPES.indexOf(to);
 
   if (toIdx <= fromIdx) return { ok: true };
   if (toIdx > fromIdx + 1) {

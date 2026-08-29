@@ -18,6 +18,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 import {
+  Brain,
   Download,
   Layers,
   Maximize2,
@@ -384,7 +385,18 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         title: newTitle,
         content: {
           type: "doc",
-          content: [{ type: "paragraph", content: [{ type: "text", text: selectedText }] }],
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: selectedText }] },
+            {
+              // Referencia de volta a sessão de onde veio — pra não perder
+              // o rastro do contexto original quando processado depois.
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Vindo de: " },
+                { type: "wikiLink", attrs: { noteId, label: title || "Sessão" } },
+              ],
+            },
+          ],
         },
       });
       editor.chain().focus().insertWikiLink({ noteId: created.id, label: created.title }).run();
@@ -482,7 +494,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-          <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
+          {note.dailyDate ? (
+            // Córtex não é um estágio do pipeline — não faz sentido oferecer
+            // o seletor de tipo aqui (qualquer promoção direta seria
+            // recusada pela trava "não dá pra pular estágio"). Só vira
+            // Estímulo de verdade via "Extrair pra Estímulo" abaixo.
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground"
+              title="Rascunho de sessão — fora do pipeline de promoção"
+            >
+              <Brain className="size-3.5" /> Córtex
+            </span>
+          ) : (
+            <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
+          )}
           <NoteTagInput value={tags} onChange={updateTags} />
           {note.dailyDate && (
             <Button

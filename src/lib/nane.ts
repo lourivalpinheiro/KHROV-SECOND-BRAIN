@@ -6,7 +6,7 @@
  * o PATCH /api/notes/[id], com todas as travas de fricção intactas), ou
  * responder uma pergunta puxando conteúdo das notas do usuário.
  */
-import { aiJSON, aiText, aiEnabled } from "@/lib/ai";
+import { aiJSON, aiText, aiWebSearch, aiEnabled } from "@/lib/ai";
 import { NOTE_TYPES, NOTE_TYPE_META, nextNoteType, isNoteType, type NoteTypeValue } from "@/lib/note-types";
 
 export type NaneIntent =
@@ -234,16 +234,34 @@ async function answerQuestion(question: string, ctx: NaneAnswerContext): Promise
  * avançar de estágio, que é calculado à parte, de forma determinística,
  * em api/nane/command). Não pode ser um resumo do que a nota já diz.
  */
-export async function suggestNoteImprovement(plainText: string, linkedTitles: string[]): Promise<string | null> {
+export async function suggestNoteImprovement(
+  title: string,
+  plainText: string,
+  linkedTitles: string[]
+): Promise<string | null> {
   if (!plainText.trim()) return null;
-  return aiText(
-    "Você é Nane, assistente de voz de um app de gestão de conhecimento pessoal. Dê UMA sugestão curta " +
-      "(1 frase, tom falado, direto) de como o CONTEÚDO dessa nota poderia ficar melhor — aprofundar um " +
-      "ponto vago, dar um exemplo concreto, considerar uma nota relacionada pra linkar, etc. Não repita " +
-      "nem resuma o que a nota já diz, e não fale sobre estágios do pipeline (isso é dito à parte). Se o " +
-      "conteúdo já estiver denso e bem desenvolvido, diga isso brevemente em vez de forçar uma crítica.",
-    `Nota:\n"""${plainText.slice(0, 1500)}"""\n\nNotas já linkadas por ela: ${linkedTitles.join(", ") || "nenhuma"}`
-  );
+
+  const [contentTip, webInfo] = await Promise.all([
+    aiText(
+      "Você é Nane, assistente de um app de gestão de conhecimento pessoal. Dê UMA sugestão curta (1 " +
+        "frase, direta) de como o CONTEÚDO dessa nota poderia ficar melhor — aprofundar um ponto vago, " +
+        "dar um exemplo concreto, considerar uma nota relacionada pra linkar, etc. Não repita nem resuma " +
+        "o que a nota já diz, e não fale sobre estágios do pipeline (isso é dito à parte). Se o conteúdo " +
+        "já estiver denso e bem desenvolvido, diga isso brevemente em vez de forçar uma crítica.",
+      `Nota:\n"""${plainText.slice(0, 1500)}"""\n\nNotas já linkadas por ela: ${linkedTitles.join(", ") || "nenhuma"}`
+    ),
+    aiWebSearch(
+      "Você busca informação factual e atualizada na web relevante ao assunto de uma nota de conhecimento " +
+        "pessoal. Devolva no máximo 2 frases só com INFORMAÇÃO — fatos, dados, definições, desenvolvimentos " +
+        "recentes — que ajudem a enriquecer a nota. NUNCA escreva argumentação, conclusão, opinião ou uma " +
+        "tese pronta: isso é trabalho de quem escreve a nota, você só entrega insumo bruto pra pesquisa. Se " +
+        "não achar nada específico e relevante o bastante, diga isso em vez de forçar algo genérico.",
+      `Nota intitulada "${title}":\n"""${plainText.slice(0, 800)}"""`
+    ),
+  ]);
+
+  if (!contentTip && !webInfo) return null;
+  return [contentTip, webInfo ? `Pesquisando na web: ${webInfo}` : null].filter(Boolean).join(" ");
 }
 
 export type NaneResult =
@@ -289,7 +307,8 @@ export async function resolveNaneCommand(
     }
     const stageFromWords = raw.targetStage ? guessStage(raw.targetStage, null) : guessStage(transcript, null);
     const targetType = stageFromWords ?? nextNoteType(note.type);
-    if (!targetType || !isNoteType(targetType) || NOTE_TYPES.indexOf(targetType) <= NOTE_TYPES.indexOf(note.type)) {
+    const pipelineTypes: readonly string[] = NOTE_TYPES;
+    if (!targetType || !isNoteType(targetType) || pipelineTypes.indexOf(targetType) <= pipelineTypes.indexOf(note.type)) {
       return {
         intent: "promote_note",
         reply: `"${note.title}" já está em ${NOTE_TYPE_META[note.type].label} ou além — não tem próximo estágio pra sugerir.`,

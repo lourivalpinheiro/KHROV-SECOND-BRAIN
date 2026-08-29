@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         title: formatTitle(dateStr),
         content: EMPTY_DOC as unknown as Prisma.InputJsonValue,
         plainText: "",
-        type: "STIMULUS",
+        type: "CORTEX",
         dailyDate,
         userId,
       },

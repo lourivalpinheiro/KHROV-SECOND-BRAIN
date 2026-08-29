@@ -30,6 +30,11 @@ model User {
  * tem uma trava de fricção — ver src/lib/note-types.ts.
  */
 enum NoteType {
+  /**
+   * Rascunho de sessão (Córtex) — não faz parte do pipeline de promoção.
+   * Só vira Estímulo de verdade quando um trecho é extraído dela.
+   */
+  CORTEX
   STIMULUS
   POTENTIATION
   SYNAPSE

@@ -97,7 +97,10 @@ export function CommandPalette() {
             <Plus /> Nova nota
           </CommandItem>
           <CommandItem onSelect={openDailyNote}>
-            <Brain /> Córtex
+            <Brain /> Sessão de hoje (Córtex)
+          </CommandItem>
+          <CommandItem onSelect={() => go("/cortex")}>
+            <Brain /> Ver Córtex
           </CommandItem>
           <CommandItem onSelect={() => go("/notes")}>
             <FileText /> Todas as notas

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
-import { EMPTY_DOC, extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
+import { EMPTY_DOC, extractLinkedNoteIds, extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
 import { isNoteType, type NoteTypeValue } from "@/lib/note-types";
+import { syncNoteLinks } from "@/lib/notes-service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -74,6 +75,13 @@ export async function POST(req: NextRequest) {
         userId,
       },
     });
+
+    // Se a nota já nasce com wikilinks no conteúdo (ex: extração do Córtex,
+    // que referencia de volta a sessão de origem), sincroniza na hora — sem
+    // isso, o link só apareceria nos backlinks depois da primeira edição.
+    if (body.content !== undefined && extractLinkedNoteIds(content).length > 0) {
+      await syncNoteLinks(note.id, content);
+    }
 
     return NextResponse.json(note, { status: 201 });
   } catch (res) {
