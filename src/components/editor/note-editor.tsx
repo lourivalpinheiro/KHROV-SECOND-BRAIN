@@ -18,12 +18,14 @@ import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 import {
+  BookOpen,
   Brain,
   Download,
   Layers,
   Maximize2,
   Minimize2,
   MoreHorizontal,
+  PenLine,
   Scissors,
   ShieldAlert,
   Sparkles,
@@ -115,6 +117,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [synthesisText, setSynthesisText] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
   const [flashcardCount, setFlashcardCount] = useState(0);
   // Direto do conteúdo atual da nota (não da tabela NoteLink, que só fica em
   // dia depois que o conteúdo é salvo) — pra trava de promoção refletir o
@@ -130,13 +133,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const loadedNoteId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isFullscreen) return;
+    if (!isFullscreen && !readingMode) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsFullscreen(false);
+      if (e.key !== "Escape") return;
+      setIsFullscreen(false);
+      setReadingMode(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isFullscreen]);
+  }, [isFullscreen, readingMode]);
 
   const extensions = useMemo(
     () => [
@@ -176,6 +181,13 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       setOutgoingLinksCount(extractLinkedNoteIds(json).filter((id) => id !== noteId).length);
     },
   });
+
+  // Modo leitura: some com a toolbar/edição, e o editor em si vira só
+  // leitura — clicar não abre cursor pra digitar (mas wikilinks/bookmarks
+  // continuam clicáveis normalmente).
+  useEffect(() => {
+    editor?.setEditable(!readingMode);
+  }, [editor, readingMode]);
 
   const saveContent = useCallback(
     async (content: unknown) => {
@@ -449,6 +461,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         <div className="mb-3 flex items-start justify-between gap-4">
           <input
             value={title}
+            readOnly={readingMode}
             onChange={(e) => {
               setTitle(e.target.value);
               debouncedSaveTitle(e.target.value);
@@ -458,8 +471,18 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           />
           <div className="flex shrink-0 items-center gap-2 pt-1">
             <span className="text-xs text-muted-foreground">
-              {saveState === "saving" ? "Salvando..." : saveState === "saved" ? "Salvo" : ""}
+              {readingMode ? "" : saveState === "saving" ? "Salvando..." : saveState === "saved" ? "Salvo" : ""}
             </span>
+            <Button
+              type="button"
+              variant={readingMode ? "default" : "ghost"}
+              size="icon"
+              className="size-8"
+              title={readingMode ? "Sair do modo leitura (Esc)" : "Modo leitura"}
+              onClick={() => setReadingMode((v) => !v)}
+            >
+              {readingMode ? <PenLine className="size-4" /> : <BookOpen className="size-4" />}
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -495,41 +518,64 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-          {note.dailyDate ? (
-            // Córtex não é um estágio do pipeline — não faz sentido oferecer
-            // o seletor de tipo aqui (qualquer promoção direta seria
-            // recusada pela trava "não dá pra pular estágio"). Só vira
-            // Estímulo de verdade via "Extrair pra Estímulo" abaixo.
-            <span
-              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground"
-              title="Rascunho de sessão — fora do pipeline de promoção"
-            >
-              <Brain className="size-3.5" /> Córtex
-            </span>
-          ) : (
-            <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
-          )}
-          <NoteTagInput value={tags} onChange={updateTags} />
-          {note.dailyDate && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              title="Selecione um trecho no texto e clique aqui pra virar uma nota Estímulo"
-              onClick={extractSelectionToStimulus}
-            >
-              <Scissors className="size-3.5" /> Extrair pra Estímulo
-            </Button>
-          )}
-        </div>
+        {readingMode ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {(() => {
+              const meta = NOTE_TYPE_META[noteType];
+              const Icon = meta.icon;
+              return (
+                <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
+                  <Icon className="size-3.5" /> {meta.label}
+                </span>
+              );
+            })()}
+            {tags.map((t) => (
+              <span key={t} className="rounded-md border px-2 py-1 text-xs">
+                #{t}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+            {note.dailyDate ? (
+              // Córtex não é um estágio do pipeline — não faz sentido oferecer
+              // o seletor de tipo aqui (qualquer promoção direta seria
+              // recusada pela trava "não dá pra pular estágio"). Só vira
+              // Estímulo de verdade via "Extrair pra Estímulo" abaixo.
+              <span
+                className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground"
+                title="Rascunho de sessão — fora do pipeline de promoção"
+              >
+                <Brain className="size-3.5" /> Córtex
+              </span>
+            ) : (
+              <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
+            )}
+            <NoteTagInput value={tags} onChange={updateTags} />
+            {note.dailyDate && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                title="Selecione um trecho no texto e clique aqui pra virar uma nota Estímulo"
+                onClick={extractSelectionToStimulus}
+              >
+                <Scissors className="size-3.5" /> Extrair pra Estímulo
+              </Button>
+            )}
+          </div>
+        )}
 
-        <div className="rounded-lg border">
-          <EditorToolbar editor={editor} />
-          <TableBubbleMenu editor={editor} />
+        <div className={cn("rounded-lg", !readingMode && "border")}>
+          {!readingMode && (
+            <>
+              <EditorToolbar editor={editor} />
+              <TableBubbleMenu editor={editor} />
+            </>
+          )}
           <EditorContent editor={editor} />
-          {flashcardCount > 0 && (
+          {!readingMode && flashcardCount > 0 && (
             <button
               type="button"
               onClick={() => router.push(`/flashcards?noteId=${noteId}`)}
