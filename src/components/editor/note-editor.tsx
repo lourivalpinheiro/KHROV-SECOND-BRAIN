@@ -31,7 +31,7 @@ import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
 import { NoteTypeSelect } from "./note-type-select";
 import { NOTE_TYPE_META, MIN_SYNTHESIS_LENGTH, checkPromotion, type NoteTypeValue } from "@/lib/note-types";
-import { extractPlainText } from "@/lib/doc-utils";
+import { extractPlainText, extractLinkedNoteIds } from "@/lib/doc-utils";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
 import { Button } from "@/components/ui/button";
@@ -104,14 +104,12 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [flashcardCount, setFlashcardCount] = useState(0);
+  // Direto do conteúdo atual da nota (não da tabela NoteLink, que só fica em
+  // dia depois que o conteúdo é salvo) — pra trava de promoção refletir o
+  // que está na nota agora, mesmo antes de qualquer save.
+  const [outgoingLinksCount, setOutgoingLinksCount] = useState(0);
   const [synthesisDraft, setSynthesisDraft] = useState<string | null>(null);
   const loadedNoteId = useRef<string | null>(null);
-
-  const { data: connections } = useSWR<{
-    incoming: { id: string; title: string }[];
-    outgoing: { id: string; title: string }[];
-  }>(`/api/notes/${noteId}/backlinks`, fetcher);
-  const outgoingLinksCount = connections?.outgoing.length ?? 0;
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -156,6 +154,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       const json = editor.getJSON();
       debouncedSaveContent(json);
       setFlashcardCount(extractFlashcards(json).length);
+      setOutgoingLinksCount(extractLinkedNoteIds(json).filter((id) => id !== noteId).length);
     },
   });
 
@@ -197,6 +196,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setNoteType(note.type);
     setSynthesisText(note.synthesisText);
     setFlashcardCount(extractFlashcards(note.content).length);
+    setOutgoingLinksCount(extractLinkedNoteIds(note.content).filter((id) => id !== note.id).length);
     // Adiado para fora do commit do efeito: evita o aviso do React sobre
     // flushSync sendo chamado durante uma renderização em andamento.
     queueMicrotask(() => {
@@ -221,7 +221,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   function requestNoteTypeChange(newType: NoteTypeValue) {
     const plainText = editor ? extractPlainText(editor.getJSON()) : "";
     const check = checkPromotion(noteType, newType, {
-      outgoingLinksCount,
+      // Aproximação otimista — só checa se existe link nenhum. O filtro
+      // anti-lixo de verdade (nota linkada precisa ter conteúdo) só o
+      // servidor consegue validar; se passar aqui e falhar lá, o catch de
+      // applyNoteTypeChange reverte e mostra o motivo certo.
+      hasValidOutgoingLink: outgoingLinksCount > 0,
       synthesisText,
       flashcardCount,
       plainText,
@@ -264,7 +268,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     const text = (synthesisDraft ?? "").trim();
     const plainText = editor ? extractPlainText(editor.getJSON()) : "";
     const check = checkPromotion("POTENTIATION", "SYNAPSE", {
-      outgoingLinksCount,
+      hasValidOutgoingLink: outgoingLinksCount > 0,
       synthesisText: text,
       flashcardCount,
       plainText,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
-import { extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
+import { extractPlainText, extractLinkedNoteIds, type TiptapDoc } from "@/lib/doc-utils";
 import { syncNoteLinks, syncNoteTags } from "@/lib/notes-service";
 import { extractFlashcards } from "@/lib/flashcards";
 import { isNoteType, checkPromotion } from "@/lib/note-types";
@@ -67,14 +67,30 @@ export async function PATCH(
       // chamando a API direto.
       const synthesisText = typeof body.synthesisText === "string" ? body.synthesisText : existing.synthesisText;
       const doc = (contentDoc ?? existing.content) as TiptapDoc;
-      const [outgoingCount, plainText] = await Promise.all([
-        prisma.noteLink.count({ where: { sourceNoteId: id } }),
-        Promise.resolve(contentDoc ? (data.plainText as string) : existing.plainText),
-      ]);
+      const plainText = contentDoc ? (data.plainText as string) : existing.plainText;
+      // Ids de nota linkados direto no conteúdo ATUAL da nota (não na tabela
+      // NoteLink) — a tabela só fica em dia depois que o conteúdo é salvo
+      // (syncNoteLinks), então checar por ela aqui podia ficar
+      // dessincronizada do que a nota realmente tem agora.
+      const linkedIds = extractLinkedNoteIds(doc).filter((linkedId) => linkedId !== id);
+      // Filtro anti-lixo: só conta como referência de verdade se a nota
+      // linkada já tiver conteúdo escrito, ou já estiver madura (Sinapse/
+      // Engrama) — senão dava pra criar um "[[a]]" vazio só pra destravar.
+      let hasValidOutgoingLink = false;
+      if (linkedIds.length > 0) {
+        const linkedNotes = await prisma.note.findMany({
+          where: { id: { in: linkedIds }, userId },
+          select: { plainText: true, type: true },
+        });
+        hasValidOutgoingLink = linkedNotes.some(
+          (n) => n.plainText.trim().length > 0 || n.type === "SYNAPSE" || n.type === "ENGRAM"
+        );
+      }
+      const flashcardCount = extractFlashcards(doc).length;
       const check = checkPromotion(existing.type, body.type, {
-        outgoingLinksCount: outgoingCount,
+        hasValidOutgoingLink,
         synthesisText,
-        flashcardCount: extractFlashcards(doc).length,
+        flashcardCount,
         plainText,
       });
       if (!check.ok) return jsonError(check.reason, 400);

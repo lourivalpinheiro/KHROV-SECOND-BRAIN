@@ -1,4 +1,4 @@
-import { Zap, FlaskConical, Gem, Fingerprint, type LucideIcon } from "lucide-react";
+import { Zap, FlaskConical, Share2, Fingerprint, type LucideIcon } from "lucide-react";
 
 /**
  * Pipeline de maturação cognitiva da nota, inspirado em neurobiologia do
@@ -27,7 +27,7 @@ export const NOTE_TYPE_META: Record<
   SYNAPSE: {
     label: "Sinapse",
     description: "Domínio lógico — o conceito consolidado, numa base autônoma.",
-    icon: Gem,
+    icon: Share2,
   },
   ENGRAM: {
     label: "Engrama",
@@ -50,8 +50,13 @@ export function nextNoteType(type: NoteTypeValue): NoteTypeValue | null {
 export const MIN_SYNTHESIS_LENGTH = 140;
 
 export type PromotionStats = {
-  /** Quantas outras notas esta nota referencia (wikilinks de saída). */
-  outgoingLinksCount: number;
+  /**
+   * Pelo menos uma nota referenciada (wikilink de saída) já tem conteúdo
+   * escrito, ou está em estágio avançado (Sinapse/Engrama) — filtro
+   * anti-lixo: sem isso, dava pra digitar `[[teste]]`, criar uma nota vazia
+   * na hora e destravar sem cumprir o espírito da trava.
+   */
+  hasValidOutgoingLink: boolean;
   /** Texto da síntese (premissa fundamental, com as palavras do usuário). */
   synthesisText: string | null;
   /** Quantos flashcards existem no conteúdo desta nota. */
@@ -81,11 +86,11 @@ export function checkPromotion(
   }
 
   if (from === "STIMULUS" && to === "POTENTIATION") {
-    if (stats.outgoingLinksCount < 1) {
+    if (!stats.hasValidOutgoingLink) {
       return {
         ok: false,
         reason:
-          "Adicione pelo menos uma referência cruzada (link [[ pra outra nota) antes de promover pra Potenciação.",
+          "Adicione um link [[ pra uma nota que já tenha conteúdo (ou esteja em Sinapse/Engrama) — linkar pra uma nota vazia só pra destravar não conta.",
       };
     }
   }
