@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { BrainCircuit, CalendarDays, FileText, Layers, Network, Plus, Search } from "lucide-react";
+import { BrainCircuit, CalendarDays, FileText, History, Layers, Network, Plus, Search } from "lucide-react";
 import { postJSON } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
@@ -109,8 +109,8 @@ export function AppSidebar({
 
         <SidebarMenu className="gap-1 px-2">
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={openDailyNote} disabled={openingDaily} tooltip="Nota de hoje">
-              <CalendarDays /> Nota de hoje
+            <SidebarMenuButton onClick={openDailyNote} disabled={openingDaily} tooltip="Sessão de hoje (Córtex)">
+              <CalendarDays /> Sessão de hoje
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -138,6 +138,15 @@ export function AppSidebar({
               tooltip="Flashcards"
             >
               <Layers /> Flashcards
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/timeline"}
+              onClick={() => router.push("/timeline")}
+              tooltip="Linha do tempo"
+            >
+              <History /> Linha do tempo
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

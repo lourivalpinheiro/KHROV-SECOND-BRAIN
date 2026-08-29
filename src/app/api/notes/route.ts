@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
-import { EMPTY_DOC } from "@/lib/doc-utils";
+import { EMPTY_DOC, extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
 import { isNoteType, type NoteTypeValue } from "@/lib/note-types";
 
 export async function GET(req: NextRequest) {
@@ -60,12 +60,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Nota sem título";
     const type = isNoteType(body.type) ? body.type : "STIMULUS";
+    // Usado pelo fluxo de extração (Sessão → Estímulo): permite criar a
+    // nota já com o trecho extraído, em vez de sempre nascer vazia.
+    const content = (body.content as TiptapDoc | undefined) ?? EMPTY_DOC;
+    const plainText = body.content !== undefined ? extractPlainText(content) : "";
 
     const note = await prisma.note.create({
       data: {
         title,
-        content: EMPTY_DOC as unknown as Prisma.InputJsonValue,
-        plainText: "",
+        content: content as unknown as Prisma.InputJsonValue,
+        plainText,
         type,
         userId,
       },

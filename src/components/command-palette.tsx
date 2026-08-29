@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { CalendarDays, FileText, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
+import { CalendarDays, FileText, History, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
 import {
@@ -97,7 +97,7 @@ export function CommandPalette() {
             <Plus /> Nova nota
           </CommandItem>
           <CommandItem onSelect={openDailyNote}>
-            <CalendarDays /> Nota de hoje
+            <CalendarDays /> Sessão de hoje
           </CommandItem>
           <CommandItem onSelect={() => go("/notes")}>
             <FileText /> Todas as notas
@@ -107,6 +107,9 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => go("/flashcards")}>
             <Layers /> Flashcards
+          </CommandItem>
+          <CommandItem onSelect={() => go("/timeline")}>
+            <History /> Linha do tempo
           </CommandItem>
         </CommandGroup>
 
