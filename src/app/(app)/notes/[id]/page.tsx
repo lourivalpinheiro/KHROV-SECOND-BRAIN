@@ -6,5 +6,8 @@ export default async function NotePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <NoteEditor noteId={id} />;
+  // key={id} força remontar o editor ao trocar de nota — sem isso, o mesmo
+  // componente (e o timer de autosave debounced dele) sobrevivia entre notas
+  // diferentes, podendo cancelar um salvamento pendente da nota anterior.
+  return <NoteEditor key={id} noteId={id} />;
 }

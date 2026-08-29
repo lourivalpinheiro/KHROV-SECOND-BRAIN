@@ -48,13 +48,37 @@ function useDebouncedCallback<Args extends unknown[]>(
   delay: number
 ) {
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return useCallback(
+  const pendingArgs = useRef<Args | null>(null);
+  const fnRef = useRef(fn);
+
+  useEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
+
+  const debounced = useCallback(
     (...args: Args) => {
+      pendingArgs.current = args;
       if (timeout.current) clearTimeout(timeout.current);
-      timeout.current = setTimeout(() => fn(...args), delay);
+      timeout.current = setTimeout(() => {
+        pendingArgs.current = null;
+        fnRef.current(...args);
+      }, delay);
     },
-    [fn, delay]
+    [delay]
   );
+
+  // Se o componente desmontar (ex: saiu da nota) antes do debounce disparar,
+  // salva na hora em vez de deixar a última mudança se perder.
+  useEffect(() => {
+    return () => {
+      if (timeout.current && pendingArgs.current) {
+        clearTimeout(timeout.current);
+        fnRef.current(...pendingArgs.current);
+      }
+    };
+  }, []);
+
+  return debounced;
 }
 
 export function NoteEditor({ noteId }: { noteId: string }) {
