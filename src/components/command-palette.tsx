@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { CalendarDays, FileText, Folder, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
+import { CalendarDays, FileText, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
-import type { FolderDTO, TagDTO } from "@/types/models";
+import type { TagDTO } from "@/types/models";
 import {
   CommandDialog,
   CommandEmpty,
@@ -58,12 +58,8 @@ export function CommandPalette() {
     open ? `/api/notes/search?q=${encodeURIComponent(debouncedQuery)}` : null,
     fetcher
   );
-  const { data: folders } = useSWR<FolderDTO[]>(open ? "/api/folders" : null, fetcher);
   const { data: tags } = useSWR<TagDTO[]>(open ? "/api/tags" : null, fetcher);
 
-  const matchedFolders = (folders ?? [])
-    .filter((f) => f.name.toLowerCase().includes(debouncedQuery.toLowerCase()))
-    .slice(0, 5);
   const matchedTags = (tags ?? [])
     .filter((t) => t.name.toLowerCase().includes(debouncedQuery.toLowerCase()))
     .slice(0, 5);
@@ -90,9 +86,9 @@ export function CommandPalette() {
       open={open}
       onOpenChange={onOpenChange}
       title="Busca rápida"
-      description="Buscar notas, pastas e tags, ou executar uma ação"
+      description="Buscar notas e tags, ou executar uma ação"
     >
-      <CommandInput placeholder="Buscar notas, pastas, tags..." value={query} onValueChange={setQuery} />
+      <CommandInput placeholder="Buscar notas, tags..." value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>Nada encontrado.</CommandEmpty>
 
@@ -121,19 +117,6 @@ export function CommandPalette() {
               {noteResults!.map((n) => (
                 <CommandItem key={n.id} value={`note-${n.id}`} onSelect={() => go(`/notes/${n.id}`)}>
                   <FileText /> {n.title || "Nota sem título"}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </>
-        )}
-
-        {debouncedQuery && matchedFolders.length > 0 && (
-          <>
-            <CommandSeparator />
-            <CommandGroup heading="Pastas">
-              {matchedFolders.map((f) => (
-                <CommandItem key={f.id} value={`folder-${f.id}`} onSelect={() => go(`/notes?folder=${f.id}`)}>
-                  <Folder /> {f.name}
                 </CommandItem>
               ))}
             </CommandGroup>

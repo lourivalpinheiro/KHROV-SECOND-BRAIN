@@ -122,7 +122,7 @@ export function ProfileForm() {
       await mutate(
         (key) =>
           typeof key === "string" &&
-          (key.startsWith("/api/notes") || key.startsWith("/api/folders") || key.startsWith("/api/tags") || key.startsWith("/api/flashcards"))
+          (key.startsWith("/api/notes") || key.startsWith("/api/tags") || key.startsWith("/api/flashcards"))
       );
       toast.success("Conta zerada. Notas, pastas e tags apagadas.");
       setResetOpen(false);

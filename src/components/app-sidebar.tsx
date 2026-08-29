@@ -16,7 +16,6 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
-import { FolderTree } from "@/components/folder-tree";
 import { TagList } from "@/components/tag-list";
 import { UserMenu } from "@/components/user-menu";
 
@@ -116,7 +115,7 @@ export function AppSidebar({
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={pathname === "/notes" && !searchParams.get("folder") && !searchParams.get("tag")}
+              isActive={pathname === "/notes" && !searchParams.get("tag")}
               onClick={() => router.push("/notes")}
               tooltip="Todas as notas"
             >
@@ -145,7 +144,6 @@ export function AppSidebar({
 
         <SidebarSeparator className="my-0" />
 
-        <FolderTree />
         <TagList />
       </SidebarContent>
 

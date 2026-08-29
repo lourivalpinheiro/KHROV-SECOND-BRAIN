@@ -1,6 +1,6 @@
 # Khrov
 
-Second Brain — notas conectadas por wikilinks (`[[`), tags, pastas, editor rico, anexos, grafo de notas e flashcards. Inspirado no método PARA de Tiago Forte.
+Second Brain — notas conectadas por wikilinks (`[[`) e grafo, sem pastas (organização é 100% por conexão + tags). Pipeline de maturação em 4 estágios: Estímulo → Potenciação → Sinapse → Engrama, cada salto com sua trava de fricção intencional.
 
 ## Stack
 
@@ -61,12 +61,13 @@ Ver [`.env.example`](.env.example). Resumo:
 ## Funcionalidades
 
 - Notas com editor rico (Tiptap): formatação, listas, checklist, tabelas, imagens, links
-- Wikilinks (`[[`) com autocomplete e criação de nota nova on-the-fly, + backlinks
-- Tags e pastas aninhadas
+- Wikilinks (`[[`) com autocomplete e criação de nota nova on-the-fly, + conexões feitas (nos dois sentidos)
+- Pipeline de 4 estágios (Estímulo/Potenciação/Sinapse/Engrama) com trava de promoção: exige referência cruzada, depois síntese com as próprias palavras, depois flashcard
+- Tags
 - Busca e filtros (título/conteúdo, tags, intervalo de datas)
 - Anexos de qualquer tipo de arquivo (Cloudflare R2, upload/download via URL assinada)
 - Grafo de notas interativo (arrastar nós, zoom)
-- Flashcards (bloco dedicado no editor) com tela de revisão filtrável por nota/pasta/tag
+- Flashcards (bloco dedicado no editor) com repetição espaçada e tela de revisão filtrável por nota/tag
 - Exportar nota em PDF
 - Editor em tela cheia
 - Tema claro/escuro

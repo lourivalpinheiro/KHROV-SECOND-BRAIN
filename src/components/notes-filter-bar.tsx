@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { CalendarRange, Folder, Search, Tags, X, ListFilter } from "lucide-react";
+import { CalendarRange, Search, Tags, X, ListFilter } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
-import type { FolderDTO, TagDTO } from "@/types/models";
+import type { TagDTO } from "@/types/models";
 import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
-import { flattenFolders } from "@/lib/folder-tree";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,18 +32,10 @@ export function NotesFilterBar() {
   const searchParams = useSearchParams();
 
   const { data: allTags } = useSWR<TagDTO[]>("/api/tags", fetcher);
-  const { data: allFolders } = useSWR<FolderDTO[]>("/api/folders", fetcher);
-  const folderOptions = useMemo(() => flattenFolders(allFolders ?? []), [allFolders]);
 
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const debouncedQ = useDebounced(q, 400);
 
-  const singleFolderId = searchParams.get("folder");
-  const selectedFolderIds = useMemo(() => {
-    const fromList = searchParams.get("folders")?.split(",").filter(Boolean) ?? [];
-    return singleFolderId ? Array.from(new Set([singleFolderId, ...fromList])) : fromList;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
   const selectedTagIds = searchParams.get("tags")?.split(",").filter(Boolean) ?? [];
   const selectedTypes = searchParams.get("types")?.split(",").filter(Boolean) ?? [];
   const from = searchParams.get("from") ?? "";
@@ -66,16 +57,6 @@ export function NotesFilterBar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ]);
 
-  function toggleFolder(id: string) {
-    const next = selectedFolderIds.includes(id)
-      ? selectedFolderIds.filter((f) => f !== id)
-      : [...selectedFolderIds, id];
-    // Migra tudo pro param plural — evita ter "folder" (singular, vindo do
-    // clique na árvore da sidebar) e "folders" (daqui) como duas fontes de
-    // verdade divergentes depois que o usuário mexe nesse filtro.
-    setParams({ folder: null, folders: next.length ? next.join(",") : null });
-  }
-
   function toggleTag(id: string) {
     const next = selectedTagIds.includes(id)
       ? selectedTagIds.filter((t) => t !== id)
@@ -92,7 +73,6 @@ export function NotesFilterBar() {
 
   const hasFilters = !!(
     q ||
-    selectedFolderIds.length ||
     selectedTagIds.length ||
     selectedTypes.length ||
     from ||
@@ -118,41 +98,6 @@ export function NotesFilterBar() {
       </div>
 
       <div className="flex items-center gap-2">
-      <Popover>
-        <PopoverTrigger
-          render={
-            <Button variant="outline" size="sm" className="h-8">
-              <Folder className="size-3.5" />
-              Pasta
-              {selectedFolderIds.length > 0 && (
-                <Badge variant="secondary" className="ml-1 px-1.5 text-[10px]">
-                  {selectedFolderIds.length}
-                </Badge>
-              )}
-            </Button>
-          }
-        />
-        <PopoverContent align="start" className="w-64">
-          <div className="max-h-56 space-y-0.5 overflow-y-auto">
-            {folderOptions.length === 0 && (
-              <p className="px-1 py-1 text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>
-            )}
-            {folderOptions.map((f) => (
-              <label
-                key={f.id}
-                className="flex items-center gap-2 rounded-sm px-1 py-1.5 text-sm hover:bg-accent"
-              >
-                <Checkbox
-                  checked={selectedFolderIds.includes(f.id)}
-                  onCheckedChange={() => toggleFolder(f.id)}
-                />
-                {f.label}
-              </label>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-
       <Popover>
         <PopoverTrigger
           render={

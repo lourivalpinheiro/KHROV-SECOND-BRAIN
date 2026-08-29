@@ -16,9 +16,9 @@ import { fetcher } from "@/lib/api-client";
 import { Network, Plus, Minus, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type GraphNode = SimulationNodeDatum & { id: string; title: string; folderId: string | null };
+type GraphNode = SimulationNodeDatum & { id: string; title: string };
 type GraphLink = SimulationLinkDatum<GraphNode>;
-type GraphData = { nodes: { id: string; title: string; folderId: string | null }[]; links: { source: string; target: string }[] };
+type GraphData = { nodes: { id: string; title: string }[]; links: { source: string; target: string }[] };
 type Point = { x: number; y: number };
 
 const WIDTH = 1000;

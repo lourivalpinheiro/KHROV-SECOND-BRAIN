@@ -25,8 +25,6 @@ type FlashcardDTO = {
   noteTitle: string;
   question: string;
   answers: string[];
-  folderId: string | null;
-  folderName: string | null;
   tags: { id: string; name: string }[];
   dueAt: string | null;
   repetitions: number;
@@ -46,7 +44,6 @@ function shuffle<T>(arr: T[]): T[] {
 export function FlashcardsView() {
   const { data: allCards, isLoading } = useSWR<FlashcardDTO[]>("/api/flashcards", fetcher);
   const [noteFilter, setNoteFilter] = useState(ALL);
-  const [folderFilter, setFolderFilter] = useState(ALL);
   const [tagFilter, setTagFilter] = useState(ALL);
   const [dueOnly, setDueOnly] = useState(true);
   const [order, setOrder] = useState<FlashcardDTO[] | null>(null);
@@ -62,12 +59,6 @@ export function FlashcardsView() {
     return Array.from(map, ([id, title]) => ({ id, title }));
   }, [allCards]);
 
-  const foldersWithCards = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const c of allCards ?? []) if (c.folderId) map.set(c.folderId, c.folderName ?? "");
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [allCards]);
-
   const tagsWithCards = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of allCards ?? []) for (const t of c.tags) map.set(t.id, t.name);
@@ -78,10 +69,9 @@ export function FlashcardsView() {
     return (allCards ?? []).filter(
       (c) =>
         (noteFilter === ALL || c.noteId === noteFilter) &&
-        (folderFilter === ALL || c.folderId === folderFilter) &&
         (tagFilter === ALL || c.tags.some((t) => t.id === tagFilter))
     );
-  }, [allCards, noteFilter, folderFilter, tagFilter]);
+  }, [allCards, noteFilter, tagFilter]);
 
   const dueFiltered = useMemo(() => filtered.filter((c) => isDue(c.dueAt)), [filtered]);
   const baseDeck = dueOnly ? dueFiltered : filtered;
@@ -165,32 +155,6 @@ export function FlashcardsView() {
             ))}
           </SelectContent>
         </Select>
-
-        {foldersWithCards.length > 0 && (
-          <Select
-            value={folderFilter}
-            onValueChange={(v) => {
-              setFolderFilter(v ?? ALL);
-              resetDeck();
-            }}
-          >
-            <SelectTrigger size="sm" className="h-8">
-              <SelectValue>
-                {(v: string) =>
-                  v === ALL ? "Todas as pastas" : foldersWithCards.find((f) => f.id === v)?.name ?? "Todas as pastas"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Todas as pastas</SelectItem>
-              {foldersWithCards.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
 
         {tagsWithCards.length > 0 && (
           <Select

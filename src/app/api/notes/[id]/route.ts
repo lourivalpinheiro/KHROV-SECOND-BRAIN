@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
 import { extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
 import { syncNoteLinks, syncNoteTags } from "@/lib/notes-service";
-import { isNoteType } from "@/lib/note-types";
+import { extractFlashcards } from "@/lib/flashcards";
+import { isNoteType, checkPromotion } from "@/lib/note-types";
 
 async function getOwnedNote(id: string, userId: string) {
   const note = await prisma.note.findUnique({ where: { id } });
@@ -23,7 +24,6 @@ export async function GET(
       where: { id },
       include: {
         tags: { include: { tag: true } },
-        folder: true,
         attachments: true,
       },
     });
@@ -52,14 +52,33 @@ export async function PATCH(
     const data: Record<string, unknown> = {};
 
     if (typeof body.title === "string") data.title = body.title.trim() || "Nota sem título";
-    if (body.folderId === null || typeof body.folderId === "string") data.folderId = body.folderId;
-    if (isNoteType(body.type)) data.type = body.type;
+    if (typeof body.synthesisText === "string") data.synthesisText = body.synthesisText;
 
     let contentDoc: TiptapDoc | undefined;
     if (body.content !== undefined) {
       contentDoc = body.content as TiptapDoc;
       data.content = contentDoc;
       data.plainText = extractPlainText(contentDoc);
+    }
+
+    if (isNoteType(body.type)) {
+      // A trava de fricção é validada aqui, no servidor — nunca só no
+      // client — senão dava pra promover sem cumprir o requisito só
+      // chamando a API direto.
+      const synthesisText = typeof body.synthesisText === "string" ? body.synthesisText : existing.synthesisText;
+      const doc = (contentDoc ?? existing.content) as TiptapDoc;
+      const [outgoingCount, plainText] = await Promise.all([
+        prisma.noteLink.count({ where: { sourceNoteId: id } }),
+        Promise.resolve(contentDoc ? (data.plainText as string) : existing.plainText),
+      ]);
+      const check = checkPromotion(existing.type, body.type, {
+        outgoingLinksCount: outgoingCount,
+        synthesisText,
+        flashcardCount: extractFlashcards(doc).length,
+        plainText,
+      });
+      if (!check.ok) return jsonError(check.reason, 400);
+      data.type = body.type;
     }
 
     const note = await prisma.note.update({ where: { id }, data });
@@ -74,7 +93,7 @@ export async function PATCH(
 
     const full = await prisma.note.findUnique({
       where: { id },
-      include: { tags: { include: { tag: true } }, folder: true, attachments: true },
+      include: { tags: { include: { tag: true } }, attachments: true },
     });
 
     return NextResponse.json(full ?? note);

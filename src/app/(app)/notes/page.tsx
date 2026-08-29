@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Folder, Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { fetcher, postJSON, deleteJSON } from "@/lib/api-client";
-import type { FolderDTO, NoteListItem, TagDTO } from "@/types/models";
+import type { NoteListItem, TagDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,8 +26,6 @@ export default function NotesPage() {
   const router = useRouter();
   const { confirm, ConfirmDialog } = useConfirm();
   const searchParams = useSearchParams();
-  const folderId = searchParams.get("folder");
-  const folderIds = searchParams.get("folders");
   const tagId = searchParams.get("tag");
   const tagIds = searchParams.get("tags");
   const q = searchParams.get("q");
@@ -37,8 +35,6 @@ export default function NotesPage() {
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
-    if (folderId) params.set("folderId", folderId);
-    if (folderIds) params.set("folderIds", folderIds);
     if (tagId) params.set("tagId", tagId);
     if (tagIds) params.set("tagIds", tagIds);
     if (q) params.set("q", q);
@@ -47,24 +43,17 @@ export default function NotesPage() {
     if (types) params.set("types", types);
     const qs = params.toString();
     return `/api/notes${qs ? `?${qs}` : ""}`;
-  }, [folderId, folderIds, tagId, tagIds, q, from, to, types]);
+  }, [tagId, tagIds, q, from, to, types]);
 
   const { data: notes, isLoading } = useSWR<NoteListItem[]>(query, fetcher);
-  const { data: folders } = useSWR<FolderDTO[]>(folderId ? "/api/folders" : null, fetcher);
   const { data: tags } = useSWR<TagDTO[]>(tagId ? "/api/tags" : null, fetcher);
 
-  const activeFolder = folders?.find((f) => f.id === folderId);
   const activeTag = tags?.find((t) => t.id === tagId);
-
-  const heading = activeFolder
-    ? activeFolder.name
-    : activeTag
-      ? `#${activeTag.name}`
-      : "Todas as notas";
+  const heading = activeTag ? `#${activeTag.name}` : "Todas as notas";
 
   async function createNote() {
     try {
-      const note = await postJSON<{ id: string }>("/api/notes", { folderId });
+      const note = await postJSON<{ id: string }>("/api/notes", {});
       router.push(`/notes/${note.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
@@ -83,7 +72,7 @@ export default function NotesPage() {
     try {
       await deleteJSON(`/api/notes/${note.id}`);
       await mutate(query);
-      await mutate((key) => typeof key === "string" && (key === "/api/folders" || key === "/api/tags"));
+      await mutate((key) => typeof key === "string" && key === "/api/tags");
       toast.success("Nota excluída.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir a nota.");
@@ -185,14 +174,8 @@ function NoteCard({
         </div>
       </div>
       {note.plainText && <p className="line-clamp-2 text-sm text-muted-foreground">{note.plainText}</p>}
-      {(note.folder || note.tags.length > 0) && (
+      {note.tags.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 pt-1">
-          {note.folder && (
-            <Badge variant="outline" className="gap-1 text-[11px] text-muted-foreground">
-              <Folder className="size-3" />
-              {note.folder.name}
-            </Badge>
-          )}
           {note.tags.map(({ tag }) => (
             <Badge key={tag.id} variant="secondary" className="text-[11px]">
               {tag.name}

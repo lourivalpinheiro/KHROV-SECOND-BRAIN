@@ -1,12 +1,3 @@
-export type FolderDTO = {
-  id: string;
-  name: string;
-  parentId: string | null;
-  /** Preenchido só nas 4 pastas-raiz do PARA (Projetos/Áreas/Recursos/Arquivo). */
-  paraCategory?: "PROJECTS" | "AREAS" | "RESOURCES" | "ARCHIVE" | null;
-  _count?: { notes: number };
-};
-
 export type TagDTO = {
   id: string;
   name: string;
@@ -17,9 +8,8 @@ export type NoteListItem = {
   id: string;
   title: string;
   plainText: string;
-  type: "FLEETING" | "LITERATURE" | "PERMANENT";
-  folderId: string | null;
-  folder?: FolderDTO | null;
+  type: "STIMULUS" | "POTENTIATION" | "SYNAPSE" | "ENGRAM";
+  synthesisText: string | null;
   updatedAt: string;
   createdAt: string;
   tags: { tag: TagDTO }[];

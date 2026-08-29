@@ -3,16 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 
 /**
- * Backup completo do usuário em JSON — pastas, tags e notas (conteúdo
- * completo em Tiptap JSON), pra não depender só do Postgres em produção.
- * Anexos não são incluídos (o arquivo em si vive no R2), só os metadados.
+ * Backup completo do usuário em JSON — tags e notas (conteúdo completo em
+ * Tiptap JSON), pra não depender só do Postgres em produção. Anexos não são
+ * incluídos (o arquivo em si vive no R2), só os metadados.
  */
 export async function GET() {
   try {
     const userId = await requireUserId();
 
-    const [folders, tags, notes] = await Promise.all([
-      prisma.folder.findMany({ where: { userId }, orderBy: { name: "asc" } }),
+    const [tags, notes] = await Promise.all([
       prisma.tag.findMany({ where: { userId }, orderBy: { name: "asc" } }),
       prisma.note.findMany({
         where: { userId },
@@ -25,17 +24,16 @@ export async function GET() {
     ]);
 
     const payload = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      folders: folders.map((f) => ({ id: f.id, name: f.name, parentId: f.parentId })),
       tags: tags.map((t) => ({ id: t.id, name: t.name })),
       notes: notes.map((n) => ({
         id: n.id,
         title: n.title,
         type: n.type,
+        synthesisText: n.synthesisText,
         content: n.content,
         plainText: n.plainText,
-        folderId: n.folderId,
         dailyDate: n.dailyDate,
         tags: n.tags.map((t) => t.tag.name),
         attachments: n.attachments,

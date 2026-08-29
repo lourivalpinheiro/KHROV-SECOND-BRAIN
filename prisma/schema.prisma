@@ -16,7 +16,6 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  folders          Folder[]
   notes            Note[]
   tags             Tag[]
   attachments      Attachment[]
@@ -24,66 +23,38 @@ model User {
 }
 
 /**
- * Estágio de maturidade da nota, inspirado no método Zettelkasten:
- * a nota nasce como captura rápida (FLEETING) e é "promovida" conforme
- * amadurece — primeiro pra algo ancorado numa fonte (LITERATURE), depois
- * pra uma ideia atômica e conectada, em texto próprio (PERMANENT).
+ * Pipeline de maturação cognitiva da nota (arquitetura neurobiológica):
+ * Estímulo (captura crua) → Potenciação (maturação, cruza referências) →
+ * Sinapse (domínio lógico, síntese com as próprias palavras) → Engrama
+ * (consolidação, validada por flashcards de evocação ativa). Cada salto
+ * tem uma trava de fricção — ver src/lib/note-types.ts.
  */
 enum NoteType {
-  FLEETING
-  LITERATURE
-  PERMANENT
-}
-
-/**
- * As 4 categorias do método PARA (Tiago Forte): Projetos, Áreas, Recursos,
- * Arquivo. Marcam as 4 pastas-raiz que todo usuário ganha automaticamente —
- * null em qualquer outra pasta (criada livremente pelo usuário).
- */
-enum ParaCategory {
-  PROJECTS
-  AREAS
-  RESOURCES
-  ARCHIVE
-}
-
-model Folder {
-  id           String        @id @default(cuid())
-  name         String
-  parentId     String?
-  parent       Folder?       @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
-  children     Folder[]      @relation("FolderToFolder")
-  /**
-   * Só preenchido nas 4 pastas-raiz do PARA — ver enum ParaCategory.
-   */
-  paraCategory ParaCategory?
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notes        Note[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@unique([userId, paraCategory])
-  @@index([userId])
-  @@index([parentId])
+  STIMULUS
+  POTENTIATION
+  SYNAPSE
+  ENGRAM
 }
 
 model Note {
-  id        String    @id @default(cuid())
-  title     String
-  content   Json
-  plainText String    @default("")
-  type      NoteType  @default(FLEETING)
+  id            String    @id @default(cuid())
+  title         String
+  content       Json
+  plainText     String    @default("")
+  type          NoteType  @default(STIMULUS)
+  /**
+   * Premissa fundamental escrita pelo usuário, com as próprias palavras —
+   * exigida pra promover de Potenciação a Sinapse (trava de fricção).
+   */
+  synthesisText String?
   /**
    * Preenchido só pras notas diárias (uma por dia por usuário); null pro resto.
    */
-  dailyDate DateTime? @db.Date
-  folderId  String?
-  folder    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  dailyDate     DateTime? @db.Date
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   tags        NoteTag[]
   attachments Attachment[]
@@ -95,7 +66,6 @@ model Note {
 
   @@unique([userId, dailyDate])
   @@index([userId])
-  @@index([folderId])
 }
 
 model Tag {

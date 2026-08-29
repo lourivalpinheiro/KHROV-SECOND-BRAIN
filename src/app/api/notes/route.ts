@@ -9,8 +9,6 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const { searchParams } = new URL(req.url);
-    const folderId = searchParams.get("folderId");
-    const folderIds = searchParams.get("folderIds")?.split(",").filter(Boolean) ?? [];
     const tagId = searchParams.get("tagId");
     const tagIds = searchParams.get("tagIds")?.split(",").filter(Boolean) ?? [];
     const q = searchParams.get("q");
@@ -19,7 +17,6 @@ export async function GET(req: NextRequest) {
     const types = (searchParams.get("types")?.split(",").filter(isNoteType) ?? []) as NoteTypeValue[];
 
     const allTagIds = tagId ? [tagId, ...tagIds] : tagIds;
-    const allFolderIds = Array.from(new Set(folderId ? [folderId, ...folderIds] : folderIds));
 
     let updatedAt: Prisma.DateTimeFilter | undefined;
     if (from || to) {
@@ -31,7 +28,6 @@ export async function GET(req: NextRequest) {
     const notes = await prisma.note.findMany({
       where: {
         userId,
-        ...(allFolderIds.length ? { folderId: { in: allFolderIds } } : {}),
         ...(types.length ? { type: { in: types } } : {}),
         // exige que a nota tenha TODAS as tags selecionadas
         ...(allTagIds.length ? { AND: allTagIds.map((id) => ({ tags: { some: { tagId: id } } })) } : {}),
@@ -48,7 +44,6 @@ export async function GET(req: NextRequest) {
       orderBy: { updatedAt: "desc" },
       include: {
         tags: { include: { tag: true } },
-        folder: true,
       },
     });
 
@@ -64,8 +59,7 @@ export async function POST(req: NextRequest) {
     const userId = await requireUserId();
     const body = await req.json().catch(() => ({}));
     const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Nota sem título";
-    const folderId = typeof body.folderId === "string" ? body.folderId : null;
-    const type = isNoteType(body.type) ? body.type : "FLEETING";
+    const type = isNoteType(body.type) ? body.type : "STIMULUS";
 
     const note = await prisma.note.create({
       data: {
@@ -73,7 +67,6 @@ export async function POST(req: NextRequest) {
         content: EMPTY_DOC as unknown as Prisma.InputJsonValue,
         plainText: "",
         type,
-        folderId,
         userId,
       },
     });

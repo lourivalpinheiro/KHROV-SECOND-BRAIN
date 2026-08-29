@@ -29,18 +29,27 @@ import { Flashcard } from "./flashcard-node";
 import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
-import { NoteFolderSelect } from "./note-folder-select";
 import { NoteTypeSelect } from "./note-type-select";
-import { NOTE_TYPE_META, type NoteTypeValue } from "@/lib/note-types";
+import { NOTE_TYPE_META, MIN_SYNTHESIS_LENGTH, checkPromotion, type NoteTypeValue } from "@/lib/note-types";
+import { extractPlainText } from "@/lib/doc-utils";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
 
@@ -90,12 +99,19 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  const [folderId, setFolderId] = useState<string | null>(null);
-  const [noteType, setNoteType] = useState<NoteTypeValue>("FLEETING");
+  const [noteType, setNoteType] = useState<NoteTypeValue>("STIMULUS");
+  const [synthesisText, setSynthesisText] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [flashcardCount, setFlashcardCount] = useState(0);
+  const [synthesisDraft, setSynthesisDraft] = useState<string | null>(null);
   const loadedNoteId = useRef<string | null>(null);
+
+  const { data: connections } = useSWR<{
+    incoming: { id: string; title: string }[];
+    outgoing: { id: string; title: string }[];
+  }>(`/api/notes/${noteId}/backlinks`, fetcher);
+  const outgoingLinksCount = connections?.outgoing.length ?? 0;
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -178,8 +194,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     loadedNoteId.current = note.id;
     setTitle(note.title);
     setTags(note.tags.map((t) => t.tag.name));
-    setFolderId(note.folderId);
     setNoteType(note.type);
+    setSynthesisText(note.synthesisText);
     setFlashcardCount(extractFlashcards(note.content).length);
     // Adiado para fora do commit do efeito: evita o aviso do React sobre
     // flushSync sendo chamado durante uma renderização em andamento.
@@ -202,32 +218,63 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     }
   }
 
-  async function updateFolder(newFolderId: string | null) {
-    setFolderId(newFolderId);
-    setSaveState("saving");
-    try {
-      await patchJSON(key, { folderId: newFolderId });
-      await mutate("/api/folders");
-      await mutate("/api/notes");
-      setSaveState("saved");
-    } catch {
-      toast.error("Erro ao mover a nota.");
+  function requestNoteTypeChange(newType: NoteTypeValue) {
+    const plainText = editor ? extractPlainText(editor.getJSON()) : "";
+    const check = checkPromotion(noteType, newType, {
+      outgoingLinksCount,
+      synthesisText,
+      flashcardCount,
+      plainText,
+    });
+    if (!check.ok) {
+      // A trava Potenciação→Sinapse pede um texto do usuário — em vez de só
+      // bloquear, abre o diálogo pra ele escrever agora.
+      if (noteType === "POTENTIATION" && newType === "SYNAPSE") {
+        setSynthesisDraft(synthesisText ?? "");
+        return;
+      }
+      toast.error(check.reason);
+      return;
     }
+    applyNoteTypeChange(newType);
   }
 
-  async function updateNoteType(newType: NoteTypeValue) {
-    const previous = noteType;
+  async function applyNoteTypeChange(newType: NoteTypeValue, newSynthesisText?: string) {
+    const previousType = noteType;
+    const previousSynthesis = synthesisText;
     setNoteType(newType);
+    if (newSynthesisText !== undefined) setSynthesisText(newSynthesisText);
     setSaveState("saving");
     try {
-      await patchJSON(key, { type: newType });
+      await patchJSON(key, {
+        type: newType,
+        ...(newSynthesisText !== undefined ? { synthesisText: newSynthesisText } : {}),
+      });
       await mutate("/api/notes");
       setSaveState("saved");
       toast.success(`Nota movida para "${NOTE_TYPE_META[newType].label}".`);
-    } catch {
-      setNoteType(previous);
-      toast.error("Erro ao mudar o estágio da nota.");
+    } catch (err) {
+      setNoteType(previousType);
+      setSynthesisText(previousSynthesis);
+      toast.error(err instanceof Error ? err.message : "Erro ao mudar o estágio da nota.");
     }
+  }
+
+  function submitSynthesis() {
+    const text = (synthesisDraft ?? "").trim();
+    const plainText = editor ? extractPlainText(editor.getJSON()) : "";
+    const check = checkPromotion("POTENTIATION", "SYNAPSE", {
+      outgoingLinksCount,
+      synthesisText: text,
+      flashcardCount,
+      plainText,
+    });
+    if (!check.ok) {
+      toast.error(check.reason);
+      return;
+    }
+    setSynthesisDraft(null);
+    applyNoteTypeChange("SYNAPSE", text);
   }
 
   async function exportPdf() {
@@ -338,8 +385,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-          <NoteTypeSelect value={noteType} onChange={updateNoteType} />
-          <NoteFolderSelect value={folderId} onChange={updateFolder} />
+          <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
           <NoteTagInput value={tags} onChange={updateTags} />
         </div>
 
@@ -363,6 +409,39 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         )}
       </div>
       {ConfirmDialog}
+
+      <Dialog open={synthesisDraft !== null} onOpenChange={(open) => !open && setSynthesisDraft(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promover pra Sinapse</DialogTitle>
+            <DialogDescription>
+              Escreva a premissa fundamental que você domina, com suas próprias palavras — não copie
+              trecho da nota. Mínimo de {MIN_SYNTHESIS_LENGTH} caracteres.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            autoFocus
+            rows={6}
+            value={synthesisDraft ?? ""}
+            onChange={(e) => setSynthesisDraft(e.target.value)}
+            placeholder="Ex: X acontece porque Y, o que implica Z..."
+          />
+          <p className="text-xs text-muted-foreground">
+            {(synthesisDraft ?? "").trim().length} / {MIN_SYNTHESIS_LENGTH} caracteres
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSynthesisDraft(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={submitSynthesis}
+              disabled={(synthesisDraft ?? "").trim().length < MIN_SYNTHESIS_LENGTH}
+            >
+              Promover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
