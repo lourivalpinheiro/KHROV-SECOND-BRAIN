@@ -17,9 +17,19 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
-import { Download, Layers, Maximize2, Minimize2, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  Download,
+  Layers,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  Scissors,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetcher, patchJSON, deleteJSON } from "@/lib/api-client";
+import { fetcher, patchJSON, postJSON, deleteJSON } from "@/lib/api-client";
 import { exportNotesToPdf, type PdfSection } from "@/lib/export-pdf";
 import { extractFlashcards } from "@/lib/flashcards";
 import type { NoteDetail } from "@/types/models";
@@ -109,6 +119,12 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   // que está na nota agora, mesmo antes de qualquer save.
   const [outgoingLinksCount, setOutgoingLinksCount] = useState(0);
   const [synthesisDraft, setSynthesisDraft] = useState<string | null>(null);
+  const [suggestingSynthesis, setSuggestingSynthesis] = useState(false);
+  // Guarda o texto exato que a IA sugeriu, pra impedir aceitar sem editar
+  // nada — o rascunho é só um ponto de partida, a síntese continua tendo
+  // que ser reescrita com as próprias palavras.
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [checkingContradictions, setCheckingContradictions] = useState(false);
   const loadedNoteId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -234,6 +250,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       // A trava Potenciação→Sinapse pede um texto do usuário — em vez de só
       // bloquear, abre o diálogo pra ele escrever agora.
       if (noteType === "POTENTIATION" && newType === "SYNAPSE") {
+        setAiSuggestion(null);
         setSynthesisDraft(synthesisText ?? "");
         return;
       }
@@ -266,6 +283,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   function submitSynthesis() {
     const text = (synthesisDraft ?? "").trim();
+    if (aiSuggestion && text === aiSuggestion.trim()) {
+      toast.error("Isso ainda é a sugestão da IA sem edição — reescreva com suas próprias palavras antes de promover.");
+      return;
+    }
     const plainText = editor ? extractPlainText(editor.getJSON()) : "";
     const check = checkPromotion("POTENTIATION", "SYNAPSE", {
       hasValidOutgoingLink: outgoingLinksCount > 0,
@@ -278,7 +299,43 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       return;
     }
     setSynthesisDraft(null);
+    setAiSuggestion(null);
     applyNoteTypeChange("SYNAPSE", text);
+  }
+
+  async function suggestSynthesisWithAI() {
+    setSuggestingSynthesis(true);
+    try {
+      const { suggestion } = await postJSON<{ suggestion: string }>(
+        `/api/notes/${noteId}/suggest-synthesis`
+      );
+      setAiSuggestion(suggestion);
+      setSynthesisDraft(suggestion);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao gerar sugestão.");
+    } finally {
+      setSuggestingSynthesis(false);
+    }
+  }
+
+  async function checkContradictions() {
+    setCheckingContradictions(true);
+    try {
+      const { contradictions } = await postJSON<{
+        contradictions: { noteId: string; title: string; reason: string }[];
+      }>(`/api/notes/${noteId}/check-contradictions`);
+      if (contradictions.length === 0) {
+        toast.success("Nenhuma contradição encontrada com as notas linkadas.");
+        return;
+      }
+      for (const c of contradictions) {
+        toast.warning(`Possível contradição com "${c.title}": ${c.reason}`, { duration: 10000 });
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao verificar contradições.");
+    } finally {
+      setCheckingContradictions(false);
+    }
   }
 
   async function exportPdf() {
@@ -307,6 +364,37 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     }
 
     exportNotesToPdf(sections);
+  }
+
+  // Fluxo de extração (Sessão/Córtex → Estímulo): pega o trecho selecionado
+  // na nota diária, vira uma nota Estímulo nova, e deixa um link no lugar —
+  // processar a sessão bruta em fragmentos endereçáveis, sem reescrever nada.
+  async function extractSelectionToStimulus() {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ").trim();
+    if (!selectedText) {
+      toast.error("Selecione um trecho de texto na sessão pra extrair.");
+      return;
+    }
+    const newTitle = selectedText.length > 60 ? `${selectedText.slice(0, 60)}…` : selectedText;
+    try {
+      const created = await postJSON<{ id: string; title: string }>("/api/notes", {
+        type: "STIMULUS",
+        title: newTitle,
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: selectedText }] }],
+        },
+      });
+      editor.chain().focus().insertWikiLink({ noteId: created.id, label: created.title }).run();
+      await mutate("/api/notes");
+      toast.success(`Estímulo criado: "${created.title}"`, {
+        action: { label: "Abrir", onClick: () => router.push(`/notes/${created.id}`) },
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao extrair o trecho.");
+    }
   }
 
   async function removeNote() {
@@ -380,6 +468,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
                 <DropdownMenuItem onClick={exportPdf}>
                   <Download /> Exportar PDF
                 </DropdownMenuItem>
+                {(noteType === "SYNAPSE" || noteType === "ENGRAM") && synthesisText?.trim() && (
+                  <DropdownMenuItem onClick={checkContradictions} disabled={checkingContradictions}>
+                    <ShieldAlert /> {checkingContradictions ? "Verificando..." : "Verificar contradições"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem variant="destructive" onClick={removeNote}>
                   <Trash2 /> Excluir nota
                 </DropdownMenuItem>
@@ -391,6 +484,18 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
           <NoteTagInput value={tags} onChange={updateTags} />
+          {note.dailyDate && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              title="Selecione um trecho no texto e clique aqui pra virar uma nota Estímulo"
+              onClick={extractSelectionToStimulus}
+            >
+              <Scissors className="size-3.5" /> Extrair pra Estímulo
+            </Button>
+          )}
         </div>
 
         <div className="rounded-lg border">
@@ -414,7 +519,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       </div>
       {ConfirmDialog}
 
-      <Dialog open={synthesisDraft !== null} onOpenChange={(open) => !open && setSynthesisDraft(null)}>
+      <Dialog
+        open={synthesisDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSynthesisDraft(null);
+            setAiSuggestion(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Promover pra Sinapse</DialogTitle>
@@ -430,11 +543,35 @@ export function NoteEditor({ noteId }: { noteId: string }) {
             onChange={(e) => setSynthesisDraft(e.target.value)}
             placeholder="Ex: X acontece porque Y, o que implica Z..."
           />
-          <p className="text-xs text-muted-foreground">
-            {(synthesisDraft ?? "").trim().length} / {MIN_SYNTHESIS_LENGTH} caracteres
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {(synthesisDraft ?? "").trim().length} / {MIN_SYNTHESIS_LENGTH} caracteres
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={suggestSynthesisWithAI}
+              disabled={suggestingSynthesis}
+              className="h-7 gap-1.5 text-xs text-muted-foreground"
+            >
+              <Sparkles className="size-3.5" />
+              {suggestingSynthesis ? "Gerando..." : "Sugerir com IA"}
+            </Button>
+          </div>
+          {aiSuggestion && (
+            <p className="text-xs text-muted-foreground">
+              Isso é só um rascunho — reescreva com suas próprias palavras antes de promover.
+            </p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSynthesisDraft(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSynthesisDraft(null);
+                setAiSuggestion(null);
+              }}
+            >
               Cancelar
             </Button>
             <Button
