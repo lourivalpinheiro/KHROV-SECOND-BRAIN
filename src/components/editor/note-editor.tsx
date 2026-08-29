@@ -37,6 +37,7 @@ import type { NoteDetail } from "@/types/models";
 import { createWikiLinkExtension } from "./wiki-link-extension";
 import { FlashcardHighlight } from "./flashcard-highlight-extension";
 import { Flashcard } from "./flashcard-node";
+import { Bookmark } from "./bookmark-node";
 import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
@@ -154,6 +155,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       createWikiLinkExtension(noteId),
       FlashcardHighlight,
       Flashcard,
+      Bookmark,
     ],
     [noteId]
   );
