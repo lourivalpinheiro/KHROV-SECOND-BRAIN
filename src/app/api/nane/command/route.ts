@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
 import { resolveNaneCommand, suggestNoteImprovement, type NaneNoteRef } from "@/lib/nane";
 import { checkPromotion, nextNoteType, NOTE_TYPE_META } from "@/lib/note-types";
 import { extractFlashcards } from "@/lib/flashcards";
-import { extractLinkedNoteIds, type TiptapDoc } from "@/lib/doc-utils";
+import { extractLinkedNoteIds, extractPlainText, type TiptapDoc } from "@/lib/doc-utils";
+import { syncNoteLinks } from "@/lib/notes-service";
 
 /**
  * Um turno de conversa com a Nane: recebe a transcrição de um comando de
@@ -136,6 +138,73 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         intent: "note_feedback",
         reply: tip ? `${gapMessage} ${tip}` : gapMessage,
+        action: null,
+      });
+    }
+
+    if (result.intent === "delete_note") {
+      // Só RESOLVE e pede confirmação — quem de fato apaga é o cliente,
+      // chamando o DELETE de sempre depois do usuário confirmar (sim/não
+      // falado ou nos botões), igual a promote_note faz pra PATCH.
+      if (!result.note) {
+        return NextResponse.json({ intent: "delete_note", reply: "Não achei nenhuma nota com esse nome.", action: null });
+      }
+      return NextResponse.json({
+        intent: "delete_note",
+        reply: `Quer que eu exclua "${result.note.title}"? Isso não pode ser desfeito.`,
+        action: { type: "confirm_delete", noteId: result.note.id, title: result.note.title },
+      });
+    }
+
+    if (result.intent === "link_notes") {
+      const { source, target } = result;
+      if (!source || !target) {
+        const missing = !source && !target ? "as duas notas" : !source ? "a primeira nota" : "a segunda nota";
+        return NextResponse.json({ intent: "link_notes", reply: `Não achei ${missing}.`, action: null });
+      }
+      if (source.id === target.id) {
+        return NextResponse.json({
+          intent: "link_notes",
+          reply: "Não dá pra linkar uma nota com ela mesma.",
+          action: null,
+        });
+      }
+
+      const full = notes.find((n) => n.id === source.id);
+      if (!full) {
+        return NextResponse.json({ intent: "link_notes", reply: "Não achei essa nota.", action: null });
+      }
+
+      const doc = full.content as TiptapDoc;
+      if (extractLinkedNoteIds(doc).includes(target.id)) {
+        return NextResponse.json({
+          intent: "link_notes",
+          reply: `"${source.title}" já está linkada com "${target.title}".`,
+          action: null,
+        });
+      }
+
+      const newDoc: TiptapDoc = {
+        ...doc,
+        content: [
+          ...(doc.content ?? []),
+          {
+            type: "paragraph",
+            content: [{ type: "wikiLink", attrs: { noteId: target.id, label: target.title } }],
+          },
+        ],
+      };
+      const newPlainText = extractPlainText(newDoc);
+
+      await prisma.note.update({
+        where: { id: source.id },
+        data: { content: newDoc as unknown as Prisma.InputJsonValue, plainText: newPlainText },
+      });
+      await syncNoteLinks(source.id, newDoc);
+
+      return NextResponse.json({
+        intent: "link_notes",
+        reply: `Linkei "${source.title}" com "${target.title}".`,
         action: null,
       });
     }

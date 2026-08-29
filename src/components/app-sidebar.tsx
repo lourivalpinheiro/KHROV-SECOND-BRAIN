@@ -13,7 +13,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
@@ -148,11 +147,6 @@ export function AppSidebar({
               <History /> Linha do tempo
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
-
-        <SidebarSeparator className="my-0" />
-
-        <SidebarMenu className="gap-1 px-2">
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={pathname === "/tags"}

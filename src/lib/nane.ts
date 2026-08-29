@@ -14,6 +14,8 @@ export type NaneIntent =
   | "open_note"
   | "promote_note"
   | "note_feedback"
+  | "delete_note"
+  | "link_notes"
   | "answer_question"
   | "unknown";
 
@@ -25,6 +27,8 @@ type RawIntent = {
   noteQuery?: string;
   targetStage?: string;
   noteContent?: string;
+  /** Só pra link_notes: a segunda nota, a que a primeira vai linkar. */
+  targetNoteQuery?: string;
 };
 
 /** "essa nota"/"nota atual"/vazio (com contexto) — usuário quer dizer a nota que está aberta agora. */
@@ -111,6 +115,25 @@ function ruleBasedIntent(transcript: string): RawIntent {
     };
   }
 
+  if (/^(apaga|apague|exclu[ai]|deleta)\b/.test(n)) {
+    return {
+      intent: "delete_note",
+      reply: "Deixa eu achar essa nota...",
+      noteQuery: transcript.replace(/^\s*\S+\s*/, "").trim(),
+    };
+  }
+
+  if (/^(linka|link|conecta|relaciona)\b/.test(n) && / com /.test(n)) {
+    const rest = transcript.replace(/^\s*\S+\s*/, "");
+    const [first, second] = rest.split(/\bcom\b/i);
+    return {
+      intent: "link_notes",
+      reply: "Deixa eu achar as duas notas...",
+      noteQuery: (first ?? "").trim(),
+      targetNoteQuery: (second ?? "").trim(),
+    };
+  }
+
   if (/\b(melhorar?|sugest[aã]o|sugest[oõ]es|dica[s]?)\b/.test(n)) {
     return {
       intent: "note_feedback",
@@ -140,18 +163,24 @@ async function classifyIntent(transcript: string, notes: NaneNoteRef[]): Promise
       "referências e aprofunda) → Sinapse (síntese consolidada) → Engrama (validado por flashcards). " +
       "Você recebe um comando de voz TRANSCRITO (pode ter erros de reconhecimento de fala — corrija " +
       "mentalmente erros óbvios) e decide a intenção. Responda só em JSON com este formato: " +
-      '{"intent": "create_note"|"open_note"|"promote_note"|"note_feedback"|"answer_question"|"unknown", ' +
+      '{"intent": "create_note"|"open_note"|"promote_note"|"note_feedback"|"delete_note"|"link_notes"|' +
+      '"answer_question"|"unknown", ' +
       '"reply": string curta em português, no tom falado de uma assistente de voz, ' +
-      '"noteQuery": string opcional (título ou parte do título da nota; deixe vazio ou diga "essa nota"/' +
-      '"nota atual" se o usuário se referir à nota que está aberta na tela agora — não peça pra ' +
-      "especificar, some pra open_note/promote_note/note_feedback), " +
+      '"noteQuery": string opcional (título ou parte do título da nota — pra link_notes, é a PRIMEIRA ' +
+      'nota; deixe vazio ou diga "essa nota"/"nota atual" se o usuário se referir à nota que está aberta ' +
+      "na tela agora — não peça pra especificar, some pra open_note/promote_note/note_feedback/" +
+      "delete_note/link_notes), " +
       '"targetStage": string opcional (Estímulo/Potenciação/Sinapse/Engrama, só pra promote_note), ' +
+      '"targetNoteQuery": string opcional (só pra link_notes: a SEGUNDA nota, a que a primeira vai ' +
+      "linkar), " +
       '"noteContent": string opcional (só pra create_note: o texto que vira o corpo da nota, limpo, ' +
       "sem frases tipo 'Nane, anota que...' no começo)}. " +
       "Se o comando for uma pergunta sobre o que o usuário já sabe/escreveu, é answer_question. Se for " +
       "só falar algo pra guardar, é create_note. Se pedir pra abrir/ir pra uma nota, é open_note. Se " +
       "pedir pra promover/mover uma nota de estágio, é promote_note. Se pedir sugestão, dica ou como " +
-      "melhorar uma nota (a atual ou uma nomeada), é note_feedback.",
+      "melhorar uma nota (a atual ou uma nomeada), é note_feedback. Se pedir pra apagar/excluir uma " +
+      "nota, é delete_note (SEMPRE peça confirmação antes — nunca finja que já apagou). Se pedir pra " +
+      "linkar/conectar/relacionar uma nota com outra, é link_notes.",
     `Notas existentes do usuário:\n${noteList}\n\nComando transcrito: "${transcript}"`
   );
 
@@ -222,6 +251,8 @@ export type NaneResult =
   | { intent: "open_note"; reply: string; note: NaneNoteRef | null }
   | { intent: "promote_note"; reply: string; note: NaneNoteRef | null; targetType: NoteTypeValue | null }
   | { intent: "note_feedback"; note: NaneNoteRef | null }
+  | { intent: "delete_note"; note: NaneNoteRef | null }
+  | { intent: "link_notes"; source: NaneNoteRef | null; target: NaneNoteRef | null }
   | { intent: "answer_question"; reply: string }
   | { intent: "unknown"; reply: string };
 
@@ -272,6 +303,17 @@ export async function resolveNaneCommand(
       note,
       targetType,
     };
+  }
+
+  if (raw.intent === "delete_note") {
+    const note = resolveTargetNote(raw.noteQuery, transcript, notes, contextNoteId);
+    return { intent: "delete_note", note };
+  }
+
+  if (raw.intent === "link_notes") {
+    const source = resolveTargetNote(raw.noteQuery, transcript, notes, contextNoteId);
+    const target = raw.targetNoteQuery ? matchNote(raw.targetNoteQuery, notes) : null;
+    return { intent: "link_notes", source, target };
   }
 
   if (raw.intent === "answer_question") {

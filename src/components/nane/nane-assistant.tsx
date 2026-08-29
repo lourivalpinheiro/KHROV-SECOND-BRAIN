@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { mutate } from "swr";
-import { Mic, MicOff, Volume2, VolumeX, X, Check, Loader2 } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, X, Check, Loader2, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { postJSON, patchJSON } from "@/lib/api-client";
+import { postJSON, patchJSON, deleteJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NOTE_TYPE_META } from "@/lib/note-types";
@@ -64,12 +64,56 @@ const VAD_QUIET_STOP_MS = 3000;
 
 type Phase = "idle" | "wake" | "listening" | "thinking" | "confirm";
 type ChatMessage = { role: "user" | "nane"; text: string };
-type PendingPromote = { noteId: string; title: string; targetType: string };
+type PendingConfirm =
+  | { kind: "promote"; noteId: string; title: string; targetType: string }
+  | { kind: "delete"; noteId: string; title: string };
 
-function speak(text: string) {
+// A Web Speech API não expõe gênero da voz de verdade — só nome e idioma.
+// Isso é um heurístico por nome (funciona bem no Chrome/Android, onde a
+// voz pt-BR padrão já costuma ser feminina; menos garantido noutros
+// aparelhos/pacotes de voz instalados). Cacheado no módulo, escolhido uma
+// vez por carregamento da página.
+let cachedVoice: SpeechSynthesisVoice | null | undefined;
+
+const FEMALE_VOICE_HINT = /female|mulher|femin|maria\b|luciana|vit[oó]ria|fernanda|camila|joana|in[eê]s|helena|carla/i;
+const MALE_VOICE_HINT = /\bmale\b|homem|masculin|daniel|felipe|ricardo|jorge|marcos\b|paulo|thiago|diego|bruno/i;
+
+function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const ptVoices = voices.filter((v) => v.lang.toLowerCase().startsWith("pt"));
+  const pool = ptVoices.length ? ptVoices : voices;
+  if (pool.length === 0) return null;
+
+  return pool.find((v) => FEMALE_VOICE_HINT.test(v.name)) ?? pool.find((v) => !MALE_VOICE_HINT.test(v.name)) ?? pool[0];
+}
+
+function loadVoicesOnce(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    const existing = window.speechSynthesis.getVoices();
+    if (existing.length > 0) {
+      resolve(existing);
+      return;
+    }
+    const onVoices = () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", onVoices);
+      resolve(window.speechSynthesis.getVoices());
+    };
+    window.speechSynthesis.addEventListener("voiceschanged", onVoices);
+    // Nem todo navegador dispara voiceschanged — não trava esperando.
+    setTimeout(() => {
+      window.speechSynthesis.removeEventListener("voiceschanged", onVoices);
+      resolve(window.speechSynthesis.getVoices());
+    }, 1000);
+  });
+}
+
+async function speak(text: string) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "pt-BR";
+  if (cachedVoice === undefined) {
+    cachedVoice = pickFemaleVoice(await loadVoicesOnce());
+  }
+  if (cachedVoice) utterance.voice = cachedVoice;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
@@ -91,7 +135,8 @@ export function NaneAssistant() {
   const [muted, setMuted] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState("");
-  const [pendingPromote, setPendingPromote] = useState<PendingPromote | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [minimized, setMinimized] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recognitionActiveRef = useRef(false);
@@ -101,7 +146,7 @@ export function NaneAssistant() {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseRef = useRef<Phase>("idle");
   const handsFreeRef = useRef(false);
-  const pendingPromoteRef = useRef<PendingPromote | null>(null);
+  const pendingConfirmRef = useRef<PendingConfirm | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -115,8 +160,8 @@ export function NaneAssistant() {
     handsFreeRef.current = handsFree;
   }, [handsFree]);
   useEffect(() => {
-    pendingPromoteRef.current = pendingPromote;
-  }, [pendingPromote]);
+    pendingConfirmRef.current = pendingConfirm;
+  }, [pendingConfirm]);
 
   const say = useCallback(
     (text: string) => {
@@ -139,7 +184,11 @@ export function NaneAssistant() {
           router.push(`/notes/${action.noteId}`);
         }
       } else if (action?.type === "confirm_promote" && action.noteId && action.title && action.targetType) {
-        setPendingPromote({ noteId: action.noteId, title: action.title, targetType: action.targetType });
+        setPendingConfirm({ kind: "promote", noteId: action.noteId, title: action.title, targetType: action.targetType });
+        setPhase("confirm");
+        return;
+      } else if (action?.type === "confirm_delete" && action.noteId && action.title) {
+        setPendingConfirm({ kind: "delete", noteId: action.noteId, title: action.title });
         setPhase("confirm");
         return;
       }
@@ -178,8 +227,8 @@ export function NaneAssistant() {
 
   const resolveConfirm = useCallback(
     async (accepted: boolean) => {
-      const pending = pendingPromoteRef.current;
-      setPendingPromote(null);
+      const pending = pendingConfirmRef.current;
+      setPendingConfirm(null);
       if (!pending) {
         setPhase(handsFreeRef.current ? "wake" : "idle");
         return;
@@ -191,19 +240,26 @@ export function NaneAssistant() {
       }
       setPhase("thinking");
       try {
-        await patchJSON(`/api/notes/${pending.noteId}`, { type: pending.targetType });
-        await mutate("/api/notes");
-        const label = NOTE_TYPE_META[pending.targetType as keyof typeof NOTE_TYPE_META]?.label ?? pending.targetType;
-        say(`Pronto — "${pending.title}" agora é ${label}.`);
+        if (pending.kind === "promote") {
+          await patchJSON(`/api/notes/${pending.noteId}`, { type: pending.targetType });
+          await mutate("/api/notes");
+          const label = NOTE_TYPE_META[pending.targetType as keyof typeof NOTE_TYPE_META]?.label ?? pending.targetType;
+          say(`Pronto — "${pending.title}" agora é ${label}.`);
+        } else {
+          await deleteJSON(`/api/notes/${pending.noteId}`);
+          await mutate("/api/notes");
+          say(`Prontinho, excluí "${pending.title}".`);
+          if (pathname === `/notes/${pending.noteId}`) router.push("/notes");
+        }
       } catch (err) {
         // A trava de fricção do pipeline continua valendo mesmo por voz — se
         // o PATCH recusar, a Nane só repassa o motivo, não força nada.
-        say(err instanceof Error ? err.message : "Não consegui promover essa nota agora.");
+        say(err instanceof Error ? err.message : "Não consegui fazer isso agora.");
       } finally {
         setPhase(handsFreeRef.current ? "wake" : "idle");
       }
     },
-    [say]
+    [say, pathname, router]
   );
 
   const finalizeListening = useCallback(() => {
@@ -450,15 +506,41 @@ export function NaneAssistant() {
         type="button"
         variant="ghost"
         size="icon"
-        onClick={() => (open ? setOpen(false) : supported ? pushToTalk() : setOpen(true))}
+        onClick={() => {
+          if (open) {
+            // Já aberto: reabre/traz pra frente se estava minimizada, em
+            // vez de fechar — fechar de vez continua sendo só o X.
+            if (minimized) setMinimized(false);
+            else setOpen(false);
+            return;
+          }
+          setMinimized(false);
+          if (supported) pushToTalk();
+          else setOpen(true);
+        }}
         title={supported ? "Falar com a Nane" : "Conversar com a Nane"}
         className={cn("size-8", listening && "animate-pulse text-primary")}
       >
         <Mic className="size-4" />
       </Button>
 
-      {open && (
-        <div className="fixed top-16 right-4 z-40 flex max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border bg-card shadow-xl">
+      {open && minimized && (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          className="fixed top-16 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-lg"
+        >
+          {isThinking ? (
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+          ) : (
+            <Mic className={cn("size-3.5 shrink-0 text-primary", listening && "animate-pulse")} />
+          )}
+          <span className="truncate">{messages[messages.length - 1]?.text ?? "Nane"}</span>
+        </button>
+      )}
+
+      {open && !minimized && (
+        <div className="fixed top-16 left-1/2 z-40 flex max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border bg-card shadow-xl">
           <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
             <div className="flex items-center gap-2">
               <span className="font-medium">Nane</span>
@@ -475,6 +557,16 @@ export function NaneAssistant() {
                 onClick={() => setMuted((v) => !v)}
               >
                 {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title="Minimizar (continua ouvindo/conversando)"
+                onClick={() => setMinimized(true)}
+              >
+                <Minus className="size-3.5" />
               </Button>
               <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}>
                 <X className="size-3.5" />
@@ -504,7 +596,7 @@ export function NaneAssistant() {
             ))}
           </div>
 
-          {phase === "confirm" && pendingPromote && (
+          {phase === "confirm" && pendingConfirm && (
             <div className="flex items-center justify-end gap-2 border-t px-3 py-2">
               <Button variant="outline" size="sm" onClick={() => resolveConfirm(false)}>
                 Não
