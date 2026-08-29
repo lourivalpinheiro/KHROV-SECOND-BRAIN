@@ -15,7 +15,7 @@ import { toast } from "sonner";
 // gente usa. Suporte real: Chrome/Edge desktop e Android. Firefox e Safari
 // (inclusive iOS, onde o app roda como PWA) não implementam — nesses casos
 // a Nane cai pro campo de texto, nunca fica sem funcionar.
-type SpeechRecognitionResultLike = { isFinal: boolean; 0: { transcript: string } };
+type SpeechRecognitionResultLike = { isFinal: boolean; 0: { transcript: string; confidence?: number } };
 type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> };
 interface SpeechRecognitionLike extends EventTarget {
   lang: string;
@@ -39,6 +39,15 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 
 const WAKE_WORD_RE = /\bnane\b/i;
 const SILENCE_MS = 1600;
+// Motor de reconhecimento contínuo do Android/Chrome encerra sozinho a
+// qualquer ruído (não só voz) — sem isso, o restart automático dispara o
+// bipe de início a cada poucos segundos num ambiente com som de fundo.
+// Um respiro curto entre reinícios reduz (não elimina — a API não expõe
+// controle de sensibilidade) a frequência disso.
+const RESTART_DELAY_MS = 500;
+// Resultado com confiança abaixo disso é tratado como ruído, não comando —
+// quando o navegador reporta confidence (nem todos reportam de forma útil).
+const MIN_CONFIDENCE = 0.3;
 
 type Phase = "idle" | "wake" | "listening" | "thinking" | "confirm";
 type ChatMessage = { role: "user" | "nane"; text: string };
@@ -72,6 +81,7 @@ export function NaneAssistant() {
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const stoppingRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCommandRef = useRef("");
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseRef = useRef<Phase>("idle");
@@ -194,7 +204,12 @@ export function NaneAssistant() {
       let finalChunk = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
-        if (r.isFinal) finalChunk += `${r[0].transcript} `;
+        if (!r.isFinal) continue;
+        // Ruído de fundo às vezes vira uma "transcrição" de baixa confiança
+        // em vez de não gerar nada — descarta antes de tratar como fala.
+        const confidence = r[0].confidence;
+        if (typeof confidence === "number" && confidence > 0 && confidence < MIN_CONFIDENCE) continue;
+        finalChunk += `${r[0].transcript} `;
       }
       finalChunk = finalChunk.trim();
       if (!finalChunk) return;
@@ -234,13 +249,18 @@ export function NaneAssistant() {
       if (stoppingRef.current) return;
       // Chrome encerra o reconhecimento periodicamente mesmo em modo
       // contínuo — reinicia sozinho enquanto mãos-livres ou uma escuta
-      // ativa (push-to-talk) ainda fizer sentido.
+      // ativa (push-to-talk) ainda fizer sentido. Um pequeno atraso evita
+      // reiniciar instantaneamente a cada ruído captado (menos bipes).
       if (handsFreeRef.current || phaseRef.current === "listening") {
-        try {
-          recognition.start();
-        } catch {
-          // já estava rodando — ignora
-        }
+        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = setTimeout(() => {
+          if (stoppingRef.current) return;
+          try {
+            recognition.start();
+          } catch {
+            // já estava rodando — ignora
+          }
+        }, RESTART_DELAY_MS);
       }
     };
 
@@ -253,6 +273,7 @@ export function NaneAssistant() {
       stoppingRef.current = true;
       recognitionRef.current?.stop();
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       window.speechSynthesis?.cancel();
     };
   }, []);
@@ -262,6 +283,7 @@ export function NaneAssistant() {
     if (handsFree) {
       setHandsFree(false);
       stoppingRef.current = true;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
       setPhase("idle");
       return;
