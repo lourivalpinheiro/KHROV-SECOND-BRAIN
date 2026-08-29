@@ -198,6 +198,14 @@
 .ProseMirror .flashcard-multi::after {
   color: var(--chart-2);
 }
+.ProseMirror .flashcard-cloze {
+  border-left: 3px solid var(--chart-4);
+  background: color-mix(in oklch, var(--chart-4) 8%, transparent);
+}
+.ProseMirror .flashcard-cloze::after {
+  content: "cloze";
+  color: var(--chart-4);
+}
 .ProseMirror .flashcard-answers {
   margin-left: -0.75rem;
   padding-left: 0.6rem;

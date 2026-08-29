@@ -39,6 +39,23 @@ function keyFor(question: string, blockId?: unknown): string {
   return typeof blockId === "string" && blockId ? `id:${blockId}` : `q:${question}`;
 }
 
+/** Cloze deletion: `Texto com {{c1::a resposta}} escondida.` — um card por número de cN. */
+const CLOZE_RE = /\{\{c(\d+)::(.+?)\}\}/g;
+
+function extractClozeCards(text: string, nextId: () => string): Flashcard[] {
+  const matches = Array.from(text.matchAll(CLOZE_RE));
+  if (matches.length === 0) return [];
+
+  const numbers = Array.from(new Set(matches.map((m) => m[1])));
+  return numbers.map((num) => {
+    const question = text
+      .replace(CLOZE_RE, (_match, n: string, content: string) => (n === num ? "[...]" : content))
+      .trim();
+    const answers = matches.filter((m) => m[1] === num).map((m) => m[2].trim());
+    return { id: nextId(), key: keyFor(`cloze:c${num}:${text}`), question, answers };
+  });
+}
+
 /**
  * Extrai flashcards do conteúdo de uma nota. Duas fontes:
  *
@@ -47,6 +64,10 @@ function keyFor(question: string, blockId?: unknown): string {
  *    caracteres de sintaxe visíveis no texto).
  * 2. Sintaxe em texto legado, pra notas antigas: `Pergunta >> Resposta`, ou
  *    um parágrafo terminando em `==` seguido de uma lista de respostas.
+ * 3. Cloze deletion: `Texto com {{c1::a resposta}} escondida.` — esconde só
+ *    o trecho marcado, mantém o resto do parágrafo como contexto. Vários
+ *    `{{c1::...}}` no mesmo parágrafo viram respostas do mesmo card;
+ *    números diferentes (`c1`, `c2`...) viram cards separados.
  */
 export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[] {
   const cards: Flashcard[] = [];
@@ -74,6 +95,12 @@ export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[
         lastWasMultiQuestion = null;
 
         if (!text) continue;
+
+        CLOZE_RE.lastIndex = 0;
+        if (CLOZE_RE.test(text)) {
+          cards.push(...extractClozeCards(text, nextId));
+          continue;
+        }
 
         if (text.endsWith("==") && text.length > 2) {
           lastWasMultiQuestion = text.slice(0, -2).trim() || null;

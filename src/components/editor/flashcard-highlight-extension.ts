@@ -3,10 +3,13 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
+const CLOZE_RE = /\{\{c\d+::.+?\}\}/;
+
 /**
  * Destaca visualmente, em tempo real, os parágrafos reconhecidos como
- * flashcard (sintaxe "Pergunta >> Resposta" ou "Pergunta ==" + lista de
- * respostas abaixo) — só CSS via decorations, não altera o documento.
+ * flashcard (sintaxe "Pergunta >> Resposta", "Pergunta ==" + lista de
+ * respostas abaixo, ou cloze deletion "{{c1::resposta}}") — só CSS via
+ * decorations, não altera o documento.
  */
 export const FlashcardHighlight = Extension.create({
   name: "flashcardHighlight",
@@ -27,7 +30,13 @@ export const FlashcardHighlight = Extension.create({
 
                 if (!text) return;
 
-                if (text.endsWith("==") && text.length > 2) {
+                if (CLOZE_RE.test(text)) {
+                  decorations.push(
+                    Decoration.node(offset, offset + node.nodeSize, {
+                      class: "flashcard-line flashcard-cloze",
+                    })
+                  );
+                } else if (text.endsWith("==") && text.length > 2) {
                   decorations.push(
                     Decoration.node(offset, offset + node.nodeSize, {
                       class: "flashcard-line flashcard-multi",
