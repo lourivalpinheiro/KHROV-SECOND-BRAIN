@@ -27,34 +27,21 @@ function NoteList({ notes }: { notes: Backlink[] }) {
 
 export function BacklinksPanel({ noteId }: { noteId: string }) {
   const { data } = useSWR<BacklinksResponse>(`/api/notes/${noteId}/backlinks`, fetcher);
-  const outgoing = data?.outgoing ?? [];
-  const incoming = data?.incoming ?? [];
 
-  if (outgoing.length === 0 && incoming.length === 0) return null;
+  // Uma nota pode aparecer nos dois sentidos (ex: A referencia B e B também
+  // referencia A) — combina tudo numa lista só, sem repetir.
+  const combined = new Map<string, Backlink>();
+  for (const n of [...(data?.outgoing ?? []), ...(data?.incoming ?? [])]) combined.set(n.id, n);
+  const notes = Array.from(combined.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  if (notes.length === 0) return null;
 
   return (
-    <div className="space-y-4 border-t pt-4">
+    <div className="space-y-2 border-t pt-4">
       <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <Link2 className="size-3.5" /> Conexões feitas ({outgoing.length + incoming.length})
+        <Link2 className="size-3.5" /> Conexões feitas ({notes.length})
       </h3>
-
-      {outgoing.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Notas referenciadas por esta ({outgoing.length})
-          </p>
-          <NoteList notes={outgoing} />
-        </div>
-      )}
-
-      {incoming.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Notas que linkam para esta ({incoming.length})
-          </p>
-          <NoteList notes={incoming} />
-        </div>
-      )}
+      <NoteList notes={notes} />
     </div>
   );
 }
