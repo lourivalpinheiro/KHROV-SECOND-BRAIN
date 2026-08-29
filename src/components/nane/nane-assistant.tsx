@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { mutate } from "swr";
 import { Mic, MicOff, Volume2, VolumeX, X, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,15 +39,28 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 
 const WAKE_WORD_RE = /\bnane\b/i;
 const SILENCE_MS = 1600;
-// Motor de reconhecimento contínuo do Android/Chrome encerra sozinho a
-// qualquer ruído (não só voz) — sem isso, o restart automático dispara o
-// bipe de início a cada poucos segundos num ambiente com som de fundo.
-// Um respiro curto entre reinícios reduz (não elimina — a API não expõe
-// controle de sensibilidade) a frequência disso.
+// Enquanto captura um comando de verdade (fase "listening"), o reconhecimento
+// reinicia sozinho se o motor encerrar no meio da fala. Um respiro curto
+// evita reiniciar instantaneamente (menos bipe em sequência).
 const RESTART_DELAY_MS = 500;
 // Resultado com confiança abaixo disso é tratado como ruído, não comando —
 // quando o navegador reporta confidence (nem todos reportam de forma útil).
 const MIN_CONFIDENCE = 0.3;
+// --- Detecção de volume (VAD) por energia do áudio cru, via Web Audio API ---
+// O problema do modo mãos-livres "cru" (reconhecimento contínuo sempre
+// rodando) é que o motor do Android/Chrome reage a QUALQUER som, não só
+// voz, e reinicia sozinho sem parar. Em vez de deixar o reconhecimento
+// sempre ligado, aqui é ele mesmo (via este medidor de volume local, sem
+// mandar nada pra rede) que decide QUANDO vale a pena ligar o
+// reconhecimento de verdade: só quando o som cruza um limiar de volume, e
+// desliga de novo depois de um tempo em silêncio sem detectar a palavra-
+// chave. Não é um detector de voz de verdade (não distingue "alguém
+// falando perto" de "TV ligada alto") — só reduz reagir a ruído de fundo
+// constante (ventilador, trânsito ao longe, etc.), que fica abaixo do
+// limiar na maioria dos ambientes.
+const VAD_INTERVAL_MS = 150;
+const VAD_THRESHOLD = 20;
+const VAD_QUIET_STOP_MS = 3000;
 
 type Phase = "idle" | "wake" | "listening" | "thinking" | "confirm";
 type ChatMessage = { role: "user" | "nane"; text: string };
@@ -70,6 +83,7 @@ function speak(text: string) {
  */
 export function NaneAssistant() {
   const router = useRouter();
+  const pathname = usePathname();
   const [supported] = useState(() => getSpeechRecognitionCtor() !== null);
   const [open, setOpen] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
@@ -80,6 +94,7 @@ export function NaneAssistant() {
   const [pendingPromote, setPendingPromote] = useState<PendingPromote | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recognitionActiveRef = useRef(false);
   const stoppingRef = useRef(false);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCommandRef = useRef("");
@@ -87,6 +102,11 @@ export function NaneAssistant() {
   const phaseRef = useRef<Phase>("idle");
   const handsFreeRef = useRef(false);
   const pendingPromoteRef = useRef<PendingPromote | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastLoudAtRef = useRef(0);
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -135,9 +155,12 @@ export function NaneAssistant() {
       setMessages((m) => [...m, { role: "user", text }]);
       setPhase("thinking");
       try {
+        // Se o usuário está numa nota agora, "essa nota"/"nota atual" na
+        // fala se refere a ela — sem isso, a Nane não tem como saber qual.
+        const contextNoteId = pathname?.match(/^\/notes\/([^/]+)/)?.[1] ?? null;
         const result = await postJSON<{ reply: string; action: { type: string; [k: string]: unknown } | null }>(
           "/api/nane/command",
-          { transcript: text }
+          { transcript: text, contextNoteId }
         );
         say(result.reply);
         await handleAction(result.action as never);
@@ -146,7 +169,7 @@ export function NaneAssistant() {
         setPhase(handsFreeRef.current ? "wake" : "idle");
       }
     },
-    [handleAction, say]
+    [handleAction, say, pathname]
   );
 
   const resolveConfirm = useCallback(
@@ -246,17 +269,21 @@ export function NaneAssistant() {
     };
 
     recognition.onend = () => {
+      recognitionActiveRef.current = false;
       if (stoppingRef.current) return;
-      // Chrome encerra o reconhecimento periodicamente mesmo em modo
-      // contínuo — reinicia sozinho enquanto mãos-livres ou uma escuta
-      // ativa (push-to-talk) ainda fizer sentido. Um pequeno atraso evita
-      // reiniciar instantaneamente a cada ruído captado (menos bipes).
-      if (handsFreeRef.current || phaseRef.current === "listening") {
+      // Enquanto captura um comando ou espera a confirmação de sim/não,
+      // reinicia pra sobreviver a uma pausa curta no meio da fala — igual
+      // antes. Na fase "wake" (só esperando a palavra-chave), NÃO reinicia
+      // sozinho mais: quem decide religar o reconhecimento agora é o
+      // medidor de volume (VAD) abaixo, só quando detectar som alto de
+      // novo — senão volta a reagir a qualquer ruído de fundo o tempo todo.
+      if (phaseRef.current === "listening" || phaseRef.current === "confirm") {
         if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
         restartTimerRef.current = setTimeout(() => {
           if (stoppingRef.current) return;
           try {
             recognition.start();
+            recognitionActiveRef.current = true;
           } catch {
             // já estava rodando — ignora
           }
@@ -268,15 +295,95 @@ export function NaneAssistant() {
     return recognition;
   }, [resetSilenceTimer, resolveConfirm]);
 
+  const stopVad = useCallback(() => {
+    if (vadIntervalRef.current) clearInterval(vadIntervalRef.current);
+    vadIntervalRef.current = null;
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    analyserRef.current = null;
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+  }, []);
+
+  const startVad = useCallback(async () => {
+    if (audioCtxRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      const AudioCtxCtor =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtxCtor();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+
+      const data = new Uint8Array(analyser.fftSize);
+      lastLoudAtRef.current = Date.now();
+
+      vadIntervalRef.current = setInterval(() => {
+        const an = analyserRef.current;
+        if (!an) return;
+        an.getByteTimeDomainData(data);
+        let sumSquares = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = data[i] - 128;
+          sumSquares += v * v;
+        }
+        const rms = Math.sqrt(sumSquares / data.length);
+
+        if (rms > VAD_THRESHOLD) {
+          lastLoudAtRef.current = Date.now();
+          if (phaseRef.current === "wake" && !recognitionActiveRef.current) {
+            const recognition = ensureRecognition();
+            if (recognition) {
+              try {
+                recognition.start();
+                recognitionActiveRef.current = true;
+              } catch {
+                // já rodando
+              }
+            }
+          }
+        } else if (
+          phaseRef.current === "wake" &&
+          recognitionActiveRef.current &&
+          Date.now() - lastLoudAtRef.current > VAD_QUIET_STOP_MS
+        ) {
+          // Um tempo em silêncio sem achar a palavra-chave — desliga o
+          // reconhecimento de vez em vez de deixar rodando à toa até o
+          // motor decidir encerrar sozinho.
+          recognitionActiveRef.current = false;
+          try {
+            recognitionRef.current?.stop();
+          } catch {
+            // já parado
+          }
+        }
+      }, VAD_INTERVAL_MS);
+    } catch {
+      toast.error("Preciso de permissão de microfone pra funcionar.");
+      setHandsFree(false);
+      setPhase("idle");
+    }
+  }, [ensureRecognition]);
+
   useEffect(() => {
     return () => {
       stoppingRef.current = true;
       recognitionRef.current?.stop();
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      stopVad();
       window.speechSynthesis?.cancel();
     };
-  }, []);
+  }, [stopVad]);
 
   function toggleHandsFree() {
     if (!supported) return;
@@ -284,21 +391,21 @@ export function NaneAssistant() {
       setHandsFree(false);
       stoppingRef.current = true;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionActiveRef.current = false;
       recognitionRef.current?.stop();
+      stopVad();
       setPhase("idle");
       return;
     }
-    const recognition = ensureRecognition();
-    if (!recognition) return;
+    if (!ensureRecognition()) return;
     stoppingRef.current = false;
     setHandsFree(true);
     setPhase("wake");
     setOpen(true);
-    try {
-      recognition.start();
-    } catch {
-      // já rodando
-    }
+    // Não liga o reconhecimento aqui — fica esperando o medidor de volume
+    // (VAD) detectar som alto o bastante pra valer a pena tentar ouvir a
+    // palavra-chave. É essa troca que evita reagir a qualquer ruído.
+    startVad();
   }
 
   function pushToTalk() {
@@ -309,11 +416,15 @@ export function NaneAssistant() {
     pendingCommandRef.current = "";
     stoppingRef.current = false;
     setPhase("listening");
-    if (!handsFree) {
+    // Com o VAD, o reconhecimento pode estar parado mesmo com mãos-livres
+    // ligado (esperando som alto) — checa se já está rodando de verdade,
+    // não só se o modo mãos-livres está ativo.
+    if (!recognitionActiveRef.current) {
       try {
         recognition.start();
+        recognitionActiveRef.current = true;
       } catch {
-        // já rodando (mãos-livres ligado) — tudo bem, só mudou a fase
+        // já rodando
       }
     }
   }
@@ -371,8 +482,8 @@ export function NaneAssistant() {
             {messages.length === 0 && (
               <p className="text-muted-foreground">
                 {supported
-                  ? 'Aperte o microfone e fale, ou ligue o modo mãos-livres pra chamar por "Nane".'
-                  : "Seu navegador não tem reconhecimento de fala — digite o que quiser pedir."}
+                  ? 'Aperte o microfone e fale, ligue o modo mãos-livres pra chamar por "Nane", ou escreva ali embaixo.'
+                  : "Seu navegador não tem reconhecimento de fala — escreva ali embaixo."}
               </p>
             )}
             {messages.map((m, i) => (
@@ -400,8 +511,8 @@ export function NaneAssistant() {
             </div>
           )}
 
-          <div className="border-t p-2">
-            {supported ? (
+          <div className="space-y-2 border-t p-2">
+            {supported && (
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -417,19 +528,18 @@ export function NaneAssistant() {
                   <Mic className="size-3.5" />
                 </Button>
               </div>
-            ) : (
-              <form onSubmit={submitText} className="flex items-center gap-2">
-                <Input
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Fale com a Nane..."
-                  className="h-8 text-sm"
-                />
-                <Button type="submit" size="sm" className="h-8" disabled={isThinking}>
-                  Enviar
-                </Button>
-              </form>
             )}
+            <form onSubmit={submitText} className="flex items-center gap-2">
+              <Input
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Ou escreva pra Nane..."
+                className="h-8 text-sm"
+              />
+              <Button type="submit" size="sm" className="h-8" disabled={isThinking}>
+                Enviar
+              </Button>
+            </form>
           </div>
         </div>
       )}

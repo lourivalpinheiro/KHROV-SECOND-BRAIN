@@ -9,7 +9,13 @@
 import { aiJSON, aiText, aiEnabled } from "@/lib/ai";
 import { NOTE_TYPES, NOTE_TYPE_META, nextNoteType, isNoteType, type NoteTypeValue } from "@/lib/note-types";
 
-export type NaneIntent = "create_note" | "open_note" | "promote_note" | "answer_question" | "unknown";
+export type NaneIntent =
+  | "create_note"
+  | "open_note"
+  | "promote_note"
+  | "note_feedback"
+  | "answer_question"
+  | "unknown";
 
 export type NaneNoteRef = { id: string; title: string; type: NoteTypeValue };
 
@@ -20,6 +26,28 @@ type RawIntent = {
   targetStage?: string;
   noteContent?: string;
 };
+
+/** "essa nota"/"nota atual"/vazio (com contexto) — usuário quer dizer a nota que está aberta agora. */
+function wantsCurrentNote(query: string | undefined): boolean {
+  if (!query) return true;
+  const n = normalize(query);
+  return /\b(essa|esta|atual|aqui)\b/.test(n) && !/\b(sobre|chamada)\b/.test(n);
+}
+
+/** Resolve qual nota o comando quer dizer: por nome, ou a nota atualmente aberta (contexto). */
+function resolveTargetNote(
+  noteQuery: string | undefined,
+  transcript: string,
+  notes: NaneNoteRef[],
+  contextNoteId: string | null
+): NaneNoteRef | null {
+  if (wantsCurrentNote(noteQuery) && contextNoteId) {
+    const current = notes.find((n) => n.id === contextNoteId);
+    if (current) return current;
+  }
+  const query = noteQuery || transcript;
+  return matchNote(query, notes);
+}
 
 const STAGE_WORDS: Record<string, NoteTypeValue> = {
   "estímulo": "STIMULUS",
@@ -83,6 +111,14 @@ function ruleBasedIntent(transcript: string): RawIntent {
     };
   }
 
+  if (/\b(melhorar?|sugest[aã]o|sugest[oõ]es|dica[s]?)\b/.test(n)) {
+    return {
+      intent: "note_feedback",
+      reply: "Deixa eu olhar essa nota...",
+      noteQuery: transcript.replace(/\b(melhorar?|sugest[aã]o|sugest[oõ]es|dica[s]?)\b/g, "").trim(),
+    };
+  }
+
   if (/^(o que|como|por que|porque|quando|quem|qual|quais)\b/.test(n) || n.endsWith("?")) {
     return {
       intent: "answer_question",
@@ -104,15 +140,18 @@ async function classifyIntent(transcript: string, notes: NaneNoteRef[]): Promise
       "referências e aprofunda) → Sinapse (síntese consolidada) → Engrama (validado por flashcards). " +
       "Você recebe um comando de voz TRANSCRITO (pode ter erros de reconhecimento de fala — corrija " +
       "mentalmente erros óbvios) e decide a intenção. Responda só em JSON com este formato: " +
-      '{"intent": "create_note"|"open_note"|"promote_note"|"answer_question"|"unknown", ' +
+      '{"intent": "create_note"|"open_note"|"promote_note"|"note_feedback"|"answer_question"|"unknown", ' +
       '"reply": string curta em português, no tom falado de uma assistente de voz, ' +
-      '"noteQuery": string opcional (título ou parte do título da nota, só pra open_note/promote_note), ' +
+      '"noteQuery": string opcional (título ou parte do título da nota; deixe vazio ou diga "essa nota"/' +
+      '"nota atual" se o usuário se referir à nota que está aberta na tela agora — não peça pra ' +
+      "especificar, some pra open_note/promote_note/note_feedback), " +
       '"targetStage": string opcional (Estímulo/Potenciação/Sinapse/Engrama, só pra promote_note), ' +
       '"noteContent": string opcional (só pra create_note: o texto que vira o corpo da nota, limpo, ' +
       "sem frases tipo 'Nane, anota que...' no começo)}. " +
       "Se o comando for uma pergunta sobre o que o usuário já sabe/escreveu, é answer_question. Se for " +
       "só falar algo pra guardar, é create_note. Se pedir pra abrir/ir pra uma nota, é open_note. Se " +
-      "pedir pra promover/mover uma nota de estágio, é promote_note.",
+      "pedir pra promover/mover uma nota de estágio, é promote_note. Se pedir sugestão, dica ou como " +
+      "melhorar uma nota (a atual ou uma nomeada), é note_feedback.",
     `Notas existentes do usuário:\n${noteList}\n\nComando transcrito: "${transcript}"`
   );
 
@@ -161,17 +200,36 @@ async function answerQuestion(question: string, ctx: NaneAnswerContext): Promise
   return answer ?? `Achei algo em "${hits[0].title}", mas não consegui formular uma resposta agora.`;
 }
 
+/**
+ * Uma dica qualitativa de conteúdo pra nota (além do que falta pra ela
+ * avançar de estágio, que é calculado à parte, de forma determinística,
+ * em api/nane/command). Não pode ser um resumo do que a nota já diz.
+ */
+export async function suggestNoteImprovement(plainText: string, linkedTitles: string[]): Promise<string | null> {
+  if (!plainText.trim()) return null;
+  return aiText(
+    "Você é Nane, assistente de voz de um app de gestão de conhecimento pessoal. Dê UMA sugestão curta " +
+      "(1 frase, tom falado, direto) de como o CONTEÚDO dessa nota poderia ficar melhor — aprofundar um " +
+      "ponto vago, dar um exemplo concreto, considerar uma nota relacionada pra linkar, etc. Não repita " +
+      "nem resuma o que a nota já diz, e não fale sobre estágios do pipeline (isso é dito à parte). Se o " +
+      "conteúdo já estiver denso e bem desenvolvido, diga isso brevemente em vez de forçar uma crítica.",
+    `Nota:\n"""${plainText.slice(0, 1500)}"""\n\nNotas já linkadas por ela: ${linkedTitles.join(", ") || "nenhuma"}`
+  );
+}
+
 export type NaneResult =
   | { intent: "create_note"; reply: string; noteContent: string }
   | { intent: "open_note"; reply: string; note: NaneNoteRef | null }
   | { intent: "promote_note"; reply: string; note: NaneNoteRef | null; targetType: NoteTypeValue | null }
+  | { intent: "note_feedback"; note: NaneNoteRef | null }
   | { intent: "answer_question"; reply: string }
   | { intent: "unknown"; reply: string };
 
 export async function resolveNaneCommand(
   transcript: string,
   notes: NaneNoteRef[],
-  answerCtx: NaneAnswerContext
+  answerCtx: NaneAnswerContext,
+  contextNoteId: string | null = null
 ): Promise<NaneResult> {
   const raw = await classifyIntent(transcript, notes);
 
@@ -188,8 +246,13 @@ export async function resolveNaneCommand(
     };
   }
 
+  if (raw.intent === "note_feedback") {
+    const note = resolveTargetNote(raw.noteQuery, transcript, notes, contextNoteId);
+    return { intent: "note_feedback", note };
+  }
+
   if (raw.intent === "promote_note") {
-    const note = raw.noteQuery ? matchNote(raw.noteQuery, notes) : null;
+    const note = resolveTargetNote(raw.noteQuery, transcript, notes, contextNoteId);
     if (!note) {
       return { intent: "promote_note", reply: "Não achei nenhuma nota com esse nome.", note: null, targetType: null };
     }
