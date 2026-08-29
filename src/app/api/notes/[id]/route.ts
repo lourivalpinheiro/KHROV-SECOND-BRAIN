@@ -5,6 +5,7 @@ import { extractPlainText, extractLinkedNoteIds, type TiptapDoc } from "@/lib/do
 import { syncNoteLinks, syncNoteTags } from "@/lib/notes-service";
 import { extractFlashcards } from "@/lib/flashcards";
 import { isNoteType, checkPromotion } from "@/lib/note-types";
+import { checkSemanticRelevance } from "@/lib/ai-note-checks";
 
 async function getOwnedNote(id: string, userId: string) {
   const note = await prisma.note.findUnique({ where: { id } });
@@ -77,14 +78,16 @@ export async function PATCH(
       // linkada já tiver conteúdo escrito, ou já estiver madura (Sinapse/
       // Engrama) — senão dava pra criar um "[[a]]" vazio só pra destravar.
       let hasValidOutgoingLink = false;
+      let validLinkedNotes: { plainText: string; type: string }[] = [];
       if (linkedIds.length > 0) {
         const linkedNotes = await prisma.note.findMany({
           where: { id: { in: linkedIds }, userId },
           select: { plainText: true, type: true },
         });
-        hasValidOutgoingLink = linkedNotes.some(
+        validLinkedNotes = linkedNotes.filter(
           (n) => n.plainText.trim().length > 0 || n.type === "SYNAPSE" || n.type === "ENGRAM"
         );
+        hasValidOutgoingLink = validLinkedNotes.length > 0;
       }
       const flashcardCount = extractFlashcards(doc).length;
       const check = checkPromotion(existing.type, body.type, {
@@ -94,6 +97,29 @@ export async function PATCH(
         plainText,
       });
       if (!check.ok) return jsonError(check.reason, 400);
+
+      // Regra do Contexto Semântico: além de exigir um link pra uma nota
+      // com conteúdo (filtro anti-lixo acima), a IA olha se essa nota tem
+      // ALGUMA relação de sentido com a atual — pega o primeiro link válido
+      // com texto (não dá pra avaliar sentido de uma nota que só é válida
+      // por já estar em Sinapse/Engrama mas ainda sem corpo). Best-effort:
+      // se a IA não responder (sem chave, timeout, etc.), não bloqueia —
+      // o filtro determinístico continua valendo sozinho.
+      if (existing.type === "STIMULUS" && body.type === "POTENTIATION" && plainText.trim()) {
+        const target = validLinkedNotes.find((n) => n.plainText.trim().length > 0);
+        if (target) {
+          const relevance = await checkSemanticRelevance(plainText, target.plainText);
+          if (relevance && !relevance.related) {
+            return jsonError(
+              relevance.reason
+                ? `A nota linkada não parece ter relação com esta: ${relevance.reason}`
+                : "A nota linkada não parece ter relação de sentido com esta — linke uma referência de verdade.",
+              400
+            );
+          }
+        }
+      }
+
       data.type = body.type;
     }
 
