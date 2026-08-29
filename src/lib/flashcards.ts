@@ -43,6 +43,12 @@ function keyFor(question: string, blockId?: unknown): string {
 const CLOZE_RE = /\{\{c(\d+)::(.+?)\}\}/g;
 
 function extractClozeCards(text: string, nextId: () => string): Flashcard[] {
+  // matchAll herda o lastIndex ATUAL do regex (não reseta pra 0 sozinho,
+  // ao contrário de test()/replace()) — como CLOZE_RE é module-level e
+  // compartilhado, o .test() de presença lá em cima pode deixar lastIndex
+  // no meio da string, fazendo matchAll perder o primeiro match. Reseta
+  // explicitamente antes de usar.
+  CLOZE_RE.lastIndex = 0;
   const matches = Array.from(text.matchAll(CLOZE_RE));
   if (matches.length === 0) return [];
 
