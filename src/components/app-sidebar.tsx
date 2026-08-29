@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { BrainCircuit, CalendarDays, FileText, History, Layers, Network, Plus, Search } from "lucide-react";
+import { Brain, BrainCircuit, FileText, History, Layers, Network, Plus, Search, Tag as TagIcon } from "lucide-react";
 import { postJSON } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
@@ -16,7 +16,6 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
-import { TagList } from "@/components/tag-list";
 import { UserMenu } from "@/components/user-menu";
 
 export function AppSidebar({
@@ -109,8 +108,8 @@ export function AppSidebar({
 
         <SidebarMenu className="gap-1 px-2">
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={openDailyNote} disabled={openingDaily} tooltip="Sessão de hoje (Córtex)">
-              <CalendarDays /> Sessão de hoje
+            <SidebarMenuButton onClick={openDailyNote} disabled={openingDaily} tooltip="Córtex — sessão de hoje">
+              <Brain /> Córtex
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -153,7 +152,17 @@ export function AppSidebar({
 
         <SidebarSeparator className="my-0" />
 
-        <TagList />
+        <SidebarMenu className="gap-1 px-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/tags"}
+              onClick={() => router.push("/tags")}
+              tooltip="Tags"
+            >
+              <TagIcon /> Tags
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarContent>
 
       <SidebarFooter>

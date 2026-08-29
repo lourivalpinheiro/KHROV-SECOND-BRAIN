@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HeaderUserMenu } from "@/components/header-user-menu";
 import { CommandPalette } from "@/components/command-palette";
+import { NaneAssistant } from "@/components/nane/nane-assistant";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
         <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </SidebarInset>
+      <NaneAssistant />
     </SidebarProvider>
   );
 }
