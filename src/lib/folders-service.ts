@@ -13,23 +13,49 @@ export const PARA_CATEGORIES: { category: ParaCategory; name: string }[] = [
 ];
 
 /**
- * Garante que o usuário tenha as 4 pastas-raiz do PARA, criando as que
- * faltarem. Idempotente — chamado a cada listagem de pastas, não altera
- * nada além de preencher o que estiver faltando (não mexe em pastas que o
- * usuário já criou por conta própria).
+ * Garante que o usuário tenha as 4 pastas-raiz do PARA. Idempotente —
+ * chamado a cada listagem de pastas. Pra cada categoria que ainda não
+ * existe:
+ *
+ * 1. Se já existe uma pasta raiz (sem categoria) com o nome exato — ex: o
+ *    usuário já tinha uma pasta "Áreas" antes dessa feature — adota ela
+ *    (só marca a categoria) em vez de criar uma duplicata.
+ * 2. Se além disso já existe também uma pasta com a categoria (de uma
+ *    versão anterior dessa função, que criava duplicata em vez de adotar),
+ *    funde as duas: nota e subpasta da pasta solta migram pra pasta
+ *    categorizada, e a solta é removida.
+ * 3. Senão, cria a pasta do zero.
  */
 export async function ensureParaFolders(userId: string): Promise<void> {
   const existing = await prisma.folder.findMany({
-    where: { userId, paraCategory: { not: null } },
-    select: { paraCategory: true },
+    where: { userId },
+    select: { id: true, name: true, parentId: true, paraCategory: true },
   });
-  const existingCategories = new Set(existing.map((f) => f.paraCategory));
-  const missing = PARA_CATEGORIES.filter((c) => !existingCategories.has(c.category));
-  if (missing.length === 0) return;
 
-  await prisma.folder.createMany({
-    data: missing.map((c) => ({ userId, name: c.name, paraCategory: c.category })),
-  });
+  for (const c of PARA_CATEGORIES) {
+    const tagged = existing.find((f) => f.paraCategory === c.category);
+    const looseMatch = existing.find(
+      (f) =>
+        !f.paraCategory &&
+        f.parentId === null &&
+        f.id !== tagged?.id &&
+        f.name.trim().toLowerCase() === c.name.toLowerCase()
+    );
+
+    if (tagged && looseMatch) {
+      // Duplicata de uma versão anterior desta função — funde na pasta certa.
+      await prisma.$transaction([
+        prisma.note.updateMany({ where: { folderId: looseMatch.id }, data: { folderId: tagged.id } }),
+        prisma.folder.updateMany({ where: { parentId: looseMatch.id }, data: { parentId: tagged.id } }),
+        prisma.folder.delete({ where: { id: looseMatch.id } }),
+      ]);
+    } else if (!tagged && looseMatch) {
+      // Adota a pasta que o usuário já tinha, em vez de duplicar.
+      await prisma.folder.update({ where: { id: looseMatch.id }, data: { paraCategory: c.category } });
+    } else if (!tagged) {
+      await prisma.folder.create({ data: { userId, name: c.name, paraCategory: c.category } });
+    }
+  }
 }
 
 /**

@@ -31,18 +31,23 @@ async function main() {
 
   console.log(`Usuário pronto: ${user.email} (id: ${user.id})`);
 
-  // Garante as 4 pastas-raiz do PARA (Projetos/Áreas/Recursos/Arquivo).
+  // Garante as 4 pastas-raiz do PARA (Projetos/Áreas/Recursos/Arquivo): adota
+  // pasta solta com o mesmo nome se já existir, em vez de duplicar.
   const existing = await prisma.folder.findMany({
-    where: { userId: user.id, paraCategory: { not: null } },
-    select: { paraCategory: true },
+    where: { userId: user.id },
+    select: { id: true, name: true, parentId: true, paraCategory: true },
   });
-  const existingCategories = new Set(existing.map((f) => f.paraCategory));
-  const missing = PARA_CATEGORIES.filter((c) => !existingCategories.has(c.category));
-  if (missing.length > 0) {
-    await prisma.folder.createMany({
-      data: missing.map((c) => ({ userId: user.id, name: c.name, paraCategory: c.category })),
-    });
-    console.log(`Pastas do PARA criadas: ${missing.map((c) => c.name).join(", ")}`);
+  for (const c of PARA_CATEGORIES) {
+    if (existing.some((f) => f.paraCategory === c.category)) continue;
+    const loose = existing.find(
+      (f) => !f.paraCategory && f.parentId === null && f.name.trim().toLowerCase() === c.name.toLowerCase()
+    );
+    if (loose) {
+      await prisma.folder.update({ where: { id: loose.id }, data: { paraCategory: c.category } });
+    } else {
+      await prisma.folder.create({ data: { userId: user.id, name: c.name, paraCategory: c.category } });
+    }
+    console.log(`Pasta do PARA pronta: ${c.name}`);
   }
 }
 

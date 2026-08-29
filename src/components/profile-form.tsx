@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Camera, Download, KeyRound, Loader2, User as UserIcon } from "lucide-react";
+import { AlertTriangle, Camera, Download, KeyRound, Loader2, User as UserIcon } from "lucide-react";
 import { fetcher, patchJSON, postJSON } from "@/lib/api-client";
 import { fileToSquareDataUrl } from "@/lib/image-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +12,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
+
+const RESET_PHRASE = "APAGAR TUDO";
 
 type ProfileDTO = { id: string; name: string | null; email: string; image: string | null };
 
@@ -98,6 +108,30 @@ export function ProfileForm() {
       toast.error(err instanceof Error ? err.message : "Erro ao trocar a senha.");
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  async function resetAccount() {
+    setResetting(true);
+    try {
+      await postJSON("/api/reset", {});
+      await mutate(
+        (key) =>
+          typeof key === "string" &&
+          (key.startsWith("/api/notes") || key.startsWith("/api/folders") || key.startsWith("/api/tags") || key.startsWith("/api/flashcards"))
+      );
+      toast.success("Conta zerada. Notas, pastas e tags apagadas.");
+      setResetOpen(false);
+      setResetConfirmText("");
+      router.push("/notes");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao zerar a conta.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -219,6 +253,60 @@ export function ProfileForm() {
           </Button>
         </CardContent>
       </Card>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base text-destructive">
+            <AlertTriangle className="size-4" /> Zona de perigo
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Apaga todas as suas notas, pastas, tags e flashcards. A conta (login e senha) continua a
+            mesma. Essa ação não pode ser desfeita — baixe um backup antes, se quiser guardar algo.
+          </p>
+          <Button variant="destructive" onClick={() => setResetOpen(true)}>
+            <AlertTriangle className="size-4" /> Zerar conta
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={resetOpen}
+        onOpenChange={(open) => {
+          setResetOpen(open);
+          if (!open) setResetConfirmText("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Zerar a conta?</DialogTitle>
+            <DialogDescription>
+              Isso apaga <strong>todas</strong> as notas, pastas, tags e flashcards, sem volta.
+              Digite <strong>{RESET_PHRASE}</strong> pra confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder={RESET_PHRASE}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={resetting || resetConfirmText.trim() !== RESET_PHRASE}
+              onClick={resetAccount}
+            >
+              {resetting && <Loader2 className="size-4 animate-spin" />}
+              Apagar tudo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
