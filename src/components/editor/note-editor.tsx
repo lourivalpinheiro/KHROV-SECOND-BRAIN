@@ -79,12 +79,23 @@ function useDebouncedCallback<Args extends unknown[]>(
     fnRef.current = fn;
   }, [fn]);
 
+  const flush = useCallback(() => {
+    if (timeout.current && pendingArgs.current) {
+      clearTimeout(timeout.current);
+      timeout.current = null;
+      const args = pendingArgs.current;
+      pendingArgs.current = null;
+      return fnRef.current(...args);
+    }
+  }, []);
+
   const debounced = useCallback(
     (...args: Args) => {
       pendingArgs.current = args;
       if (timeout.current) clearTimeout(timeout.current);
       timeout.current = setTimeout(() => {
         pendingArgs.current = null;
+        timeout.current = null;
         fnRef.current(...args);
       }, delay);
     },
@@ -94,15 +105,10 @@ function useDebouncedCallback<Args extends unknown[]>(
   // Se o componente desmontar (ex: saiu da nota) antes do debounce disparar,
   // salva na hora em vez de deixar a última mudança se perder.
   useEffect(() => {
-    return () => {
-      if (timeout.current && pendingArgs.current) {
-        clearTimeout(timeout.current);
-        fnRef.current(...pendingArgs.current);
-      }
-    };
-  }, []);
+    return flush;
+  }, [flush]);
 
-  return debounced;
+  return [debounced, flush] as const;
 }
 
 export function NoteEditor({ noteId }: { noteId: string }) {
@@ -196,12 +202,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         await patchJSON(key, { content });
         setSaveState("saved");
       } catch {
+        // Não deixa o indicador preso em "Salvando..." pra sempre — melhor
+        // mostrar estado neutro do que mentir sobre o que foi persistido.
+        setSaveState("idle");
         toast.error("Erro ao salvar o conteúdo.");
       }
     },
     [key]
   );
-  const debouncedSaveContent = useDebouncedCallback(saveContent, 700);
+  const [debouncedSaveContent, flushSaveContent] = useDebouncedCallback(saveContent, 700);
 
   const saveTitle = useCallback(
     async (value: string) => {
@@ -216,7 +225,33 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     },
     [key]
   );
-  const debouncedSaveTitle = useDebouncedCallback(saveTitle, 600);
+  const [debouncedSaveTitle, flushSaveTitle] = useDebouncedCallback(saveTitle, 600);
+
+  // Rede de segurança: o flush normal só roda quando o componente desmonta
+  // *dentro do app* (ex: navegou pra outra nota). Fechar a aba, dar reload
+  // ou o SO suspender a máquina não passa por aí — o timer do debounce é só
+  // destruído, e a última mudança (ainda dentro da janela de 700ms) se
+  // perde, mesmo com o rótulo "Salvo" visível de um checkpoint anterior.
+  // `visibilitychange` dispara antes da aba sumir de verdade (troca de aba,
+  // minimizar, fechar) e ainda dá tempo do fetch do PATCH completar, então é
+  // o sinal mais confiável pra descarregar o que está pendente.
+  useEffect(() => {
+    function flushPending() {
+      flushSaveTitle();
+      flushSaveContent();
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") flushPending();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", flushPending);
+    window.addEventListener("beforeunload", flushPending);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", flushPending);
+      window.removeEventListener("beforeunload", flushPending);
+    };
+  }, [flushSaveTitle, flushSaveContent]);
 
   // Carrega o conteúdo da nota apenas uma vez por id (evita resetar o cursor a cada revalidação do SWR).
   useEffect(() => {
@@ -414,7 +449,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         },
       });
       editor.chain().focus().insertWikiLink({ noteId: created.id, label: created.title }).run();
-      await mutate("/api/notes");
+      // A nota nova já nasce referenciando esta (sincronizado no POST acima),
+      // mas o link de volta (esta → nota nova) só existe depois que ESTE
+      // conteúdo for salvo — sem forçar aqui, ficava esperando os 700ms do
+      // debounce (ou nem persistia, se a aba fosse fechada antes disso), daí
+      // a sensação de "aparece quando quer" nas Conexões feitas. E o painel
+      // de backlinks tem seu próprio cache (SWR) — sem revalidar na mão ele
+      // só atualizaria sozinho no próximo refoco da janela.
+      await flushSaveContent();
+      await Promise.all([mutate("/api/notes"), mutate(`/api/notes/${noteId}/backlinks`)]);
       toast.success(`Estímulo criado: "${created.title}"`, {
         action: { label: "Abrir", onClick: () => router.push(`/notes/${created.id}`) },
       });
