@@ -92,7 +92,7 @@ export function NotesFilterBar() {
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por título ou conteúdo..."
+          placeholder="Buscar notas..."
           className="h-8 w-56 pl-8"
         />
       </div>
