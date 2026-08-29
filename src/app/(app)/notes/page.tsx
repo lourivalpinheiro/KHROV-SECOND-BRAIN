@@ -8,7 +8,6 @@ import { fetcher, postJSON, deleteJSON } from "@/lib/api-client";
 import type { FolderDTO, NoteListItem, TagDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotesFilterBar } from "@/components/notes-filter-bar";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -92,7 +91,7 @@ export default function NotesPage() {
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{heading}</h1>
@@ -150,7 +149,7 @@ export default function NotesPage() {
         </div>
       </div>
       {ConfirmDialog}
-    </ScrollArea>
+    </div>
   );
 }
 

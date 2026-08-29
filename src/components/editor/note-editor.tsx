@@ -33,7 +33,6 @@ import { NoteTypeSelect } from "./note-type-select";
 import { NOTE_TYPE_META, type NoteTypeValue } from "@/lib/note-types";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -234,9 +233,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   }
 
   return (
-    <ScrollArea
+    <div
       className={cn(
-        "flex-1",
+        "flex-1 overflow-y-auto",
         isFullscreen && "fixed inset-0 z-50 bg-background"
       )}
     >
@@ -316,6 +315,6 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         )}
       </div>
       {ConfirmDialog}
-    </ScrollArea>
+    </div>
   );
 }
