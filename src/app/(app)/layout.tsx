@@ -27,7 +27,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="hidden text-sm text-muted-foreground sm:inline">
             Second Brain
           </span>
-          <ThemeToggle className="ml-auto" />
+          <div className="ml-auto flex items-center gap-1">
+            <NaneAssistant />
+            <ThemeToggle />
+          </div>
           <HeaderUserMenu
             className="sm:hidden"
             name={session?.user?.name}
@@ -37,7 +40,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
         <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </SidebarInset>
-      <NaneAssistant />
     </SidebarProvider>
   );
 }

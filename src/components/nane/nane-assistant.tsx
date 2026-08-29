@@ -53,10 +53,11 @@ function speak(text: string) {
 }
 
 /**
- * Nane — assistente de voz do Khrov. Botão flutuante presente em todo o
- * app logado. Push-to-talk sempre disponível quando o navegador suporta
- * reconhecimento de fala; modo mãos-livres (wake word "Nane") é opt-in via
- * o próprio painel, nunca liga sozinho.
+ * Nane — assistente de voz do Khrov. Ícone discreto no cabeçalho (não um
+ * botão flutuante sobre o conteúdo — incomodava e cobria ações no fim de
+ * listas no mobile). Push-to-talk sempre disponível quando o navegador
+ * suporta reconhecimento de fala; modo mãos-livres (wake word "Nane") é
+ * opt-in via o próprio painel, nunca liga sozinho.
  */
 export function NaneAssistant() {
   const router = useRouter();
@@ -310,19 +311,17 @@ export function NaneAssistant() {
     <>
       <Button
         type="button"
+        variant="ghost"
         size="icon"
         onClick={() => (open ? setOpen(false) : supported ? pushToTalk() : setOpen(true))}
         title={supported ? "Falar com a Nane" : "Conversar com a Nane"}
-        className={cn(
-          "fixed right-4 bottom-4 z-40 size-12 rounded-full shadow-lg",
-          listening && "animate-pulse bg-primary"
-        )}
+        className={cn("size-8", listening && "animate-pulse text-primary")}
       >
-        {listening ? <Mic className="size-5" /> : <Mic className="size-5" />}
+        <Mic className="size-4" />
       </Button>
 
       {open && (
-        <div className="fixed right-4 bottom-20 z-40 flex max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border bg-card shadow-xl">
+        <div className="fixed top-16 right-4 z-40 flex max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border bg-card shadow-xl">
           <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
             <div className="flex items-center gap-2">
               <span className="font-medium">Nane</span>
