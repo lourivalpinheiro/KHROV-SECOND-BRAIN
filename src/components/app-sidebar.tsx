@@ -20,10 +20,14 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
@@ -99,57 +103,83 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
 
+        <SidebarGroup className="p-0 px-2">
+          <SidebarGroupLabel>Capturar</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={pathname === "/cortex"} onClick={() => router.push("/cortex")} tooltip="Córtex">
+                  <Brain /> Córtex
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="p-0 px-2">
+          <SidebarGroupLabel>Notas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/notes" && !searchParams.get("tag")}
+                  onClick={() => router.push("/notes")}
+                  tooltip="Todas as notas"
+                >
+                  <FileText /> Todas as notas
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/graph"}
+                  onClick={() => router.push("/graph")}
+                  tooltip="Grafo"
+                >
+                  <Network /> Grafo
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/timeline"}
+                  onClick={() => router.push("/timeline")}
+                  tooltip="Linha do tempo"
+                >
+                  <History /> Linha do tempo
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/tags"}
+                  onClick={() => router.push("/tags")}
+                  tooltip="Tags"
+                >
+                  <TagIcon /> Tags
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="p-0 px-2">
+          <SidebarGroupLabel>Revisão</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/flashcards"}
+                  onClick={() => router.push("/flashcards")}
+                  tooltip="Flashcards"
+                >
+                  <Layers /> Flashcards
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="my-0" />
+
         <SidebarMenu className="gap-1 px-2">
-          <SidebarMenuItem>
-            <SidebarMenuButton isActive={pathname === "/cortex"} onClick={() => router.push("/cortex")} tooltip="Córtex">
-              <Brain /> Córtex
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/notes" && !searchParams.get("tag")}
-              onClick={() => router.push("/notes")}
-              tooltip="Todas as notas"
-            >
-              <FileText /> Todas as notas
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/graph"}
-              onClick={() => router.push("/graph")}
-              tooltip="Grafo"
-            >
-              <Network /> Grafo
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/flashcards"}
-              onClick={() => router.push("/flashcards")}
-              tooltip="Flashcards"
-            >
-              <Layers /> Flashcards
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/timeline"}
-              onClick={() => router.push("/timeline")}
-              tooltip="Linha do tempo"
-            >
-              <History /> Linha do tempo
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/tags"}
-              onClick={() => router.push("/tags")}
-              tooltip="Tags"
-            >
-              <TagIcon /> Tags
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={pathname === "/trash"}
