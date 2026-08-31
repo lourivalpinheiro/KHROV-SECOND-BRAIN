@@ -47,22 +47,19 @@ export function GraphView() {
     if (!data || data.nodes.length === 0) return null;
 
     const degree = new Map<string, number>();
-    // Filhas diretas de cada nó: notas pra onde ele linka (wikilink de saída).
-    // Ao arrastar a "nota mãe" no grafo, essas filhas vêm junto.
-    const childrenOf = new Map<string, string[]>();
     for (const l of data.links) {
       degree.set(l.source, (degree.get(l.source) ?? 0) + 1);
       degree.set(l.target, (degree.get(l.target) ?? 0) + 1);
-      if (!childrenOf.has(l.source)) childrenOf.set(l.source, []);
-      childrenOf.get(l.source)!.push(l.target);
     }
 
     const nodes: GraphNode[] = data.nodes.map((n) => ({ ...n }));
     const links: GraphLink[] = data.links.map((l) => ({ source: l.source, target: l.target }));
 
-    // .stop() impede o timer interno do d3 de rodar sozinho — a gente avança
-    // a simulação manualmente no useEffect abaixo, sincronizado com rAF, pra
-    // dar tempo de renderizar cada passo (animação do grafo "se formando").
+    // .stop() impede o timer interno do d3 de rodar sozinho — quem avança a
+    // simulação é o rAF loop em runSimulation(), chamado tanto no carregamento
+    // (grafo "se formando") quanto durante o arrasto de um nó — é isso que faz
+    // os outros nós reagirem de verdade (física, não só os filhos diretos
+    // seguindo por um deslocamento fixo) em vez de ficarem parados.
     const sim = forceSimulation(nodes)
       .force(
         "link",
@@ -76,33 +73,39 @@ export function GraphView() {
       .force("collide", forceCollide(34))
       .stop();
 
-    return { nodes, links, degree, childrenOf, sim };
+    return { nodes, links, degree, sim };
   }, [data]);
 
-  // Roda a simulação em tempo real (em vez de resolver as 300 iterações de
-  // uma vez só) toda vez que o grafo é (re)carregado, pra ver os nós saindo
-  // do centro e se acomodando. Depois que a simulação esfria (ou o usuário
-  // arrasta um nó), positions passa a ser a única fonte de verdade.
-  useEffect(() => {
-    if (!layout) return;
+  // Mantém o loop de tick num ref, não um efeito — precisa poder ser
+  // "acordado" a qualquer momento (início do arrasto de um nó), não só
+  // quando o grafo é carregado pela primeira vez.
+  const rafRef = useRef(0);
+  const runningRef = useRef(false);
+
+  function runSimulation() {
+    if (!layout || runningRef.current) return;
+    runningRef.current = true;
     const { sim, nodes } = layout;
-    let raf = 0;
-    let cancelled = false;
 
     function step() {
-      if (cancelled) return;
       sim.tick();
       setPositions(Object.fromEntries(nodes.map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }])));
       if (sim.alpha() > sim.alphaMin()) {
-        raf = requestAnimationFrame(step);
+        rafRef.current = requestAnimationFrame(step);
+      } else {
+        runningRef.current = false;
       }
     }
-    raf = requestAnimationFrame(step);
+    rafRef.current = requestAnimationFrame(step);
+  }
 
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
+  // Anima o grafo "se formando" ao carregar (ou trocar de dado) — mesmo
+  // comportamento de antes, só que agora runSimulation() é reaproveitado
+  // pelo arrasto também.
+  useEffect(() => {
+    runSimulation();
+    return () => cancelAnimationFrame(rafRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runSimulation não muda de identidade de um jeito que importe aqui
   }, [layout]);
 
   function nodePos(n: GraphNode): Point {
@@ -129,6 +132,18 @@ export function GraphView() {
     dragMoved.current = false;
     setIsDragging(true);
     setHovered(id);
+
+    const node = layout?.nodes.find((n) => n.id === id);
+    if (node && layout) {
+      // Fixa o nó arrastado na posição atual (fx/fy) e "esquenta" a
+      // simulação de novo (alphaTarget > 0) — com isso, os outros nós
+      // reagem via física de verdade (link/charge/collide) a cada frame,
+      // em vez de só os filhos diretos seguirem por um deslocamento fixo.
+      node.fx = node.x;
+      node.fy = node.y;
+      layout.sim.alphaTarget(0.3).restart();
+      runSimulation();
+    }
   }
 
   function onBackgroundPointerDown(e: React.PointerEvent) {
@@ -158,20 +173,13 @@ export function GraphView() {
 
     if (dragNodeId.current) {
       dragMoved.current = true;
-      const id = dragNodeId.current;
-      const dx = e.movementX / transform.k;
-      const dy = e.movementY / transform.k;
-      // Arrasta a nota "mãe" e as filhas dela (notas pra onde ela linka) junto,
-      // como um grupo — a mesma variação de posição pra todas.
-      const idsToMove = [id, ...(layout?.childrenOf.get(id) ?? [])];
-      setPositions((prev) => {
-        const next = { ...prev };
-        for (const nid of idsToMove) {
-          const current = prev[nid] ?? { x: 0, y: 0 };
-          next[nid] = { x: current.x + dx, y: current.y + dy };
-        }
-        return next;
-      });
+      const node = layout?.nodes.find((n) => n.id === dragNodeId.current);
+      if (node) {
+        // Só atualiza fx/fy (posição fixada) — quem propaga o movimento pros
+        // outros nós é o tick da simulação (runSimulation), não este handler.
+        node.fx = (node.fx ?? node.x ?? 0) + e.movementX / transform.k;
+        node.fy = (node.fy ?? node.y ?? 0) + e.movementY / transform.k;
+      }
       return;
     }
     const start = panState.current;
@@ -183,6 +191,17 @@ export function GraphView() {
     activePointers.current.delete(e.pointerId);
     if (activePointers.current.size < 2) {
       pinchStart.current = null;
+    }
+    if (dragNodeId.current && layout) {
+      // Solta o nó (deixa de estar fixado) e esfria a simulação de volta —
+      // com alphaTarget(0) ela continua rodando mais uns instantes (dá pra
+      // ver tudo se acomodando) e depois para sozinha.
+      const node = layout.nodes.find((n) => n.id === dragNodeId.current);
+      if (node) {
+        node.fx = null;
+        node.fy = null;
+      }
+      layout.sim.alphaTarget(0);
     }
     dragNodeId.current = null;
     panState.current = null;
