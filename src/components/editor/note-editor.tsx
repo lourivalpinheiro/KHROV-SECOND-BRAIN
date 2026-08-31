@@ -37,7 +37,7 @@ import { exportNotesToPdf, type PdfSection } from "@/lib/export-pdf";
 import { extractFlashcards } from "@/lib/flashcards";
 import type { NoteDetail } from "@/types/models";
 import { createWikiLinkExtension } from "./wiki-link-extension";
-import { FlashcardHighlight } from "./flashcard-highlight-extension";
+import { FlashcardHighlight, FLASHCARD_STUDY_EVENT } from "./flashcard-highlight-extension";
 import { Flashcard } from "./flashcard-node";
 import { Bookmark } from "./bookmark-node";
 import { EditorToolbar } from "./toolbar";
@@ -150,6 +150,18 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFullscreen, readingMode]);
+
+  // Disparado pelo ícone de seta no fim de uma linha reconhecida como
+  // flashcard (ver flashcard-highlight-extension.ts) — evento simples em
+  // vez de prop, porque quem desenha o botão é um plugin do ProseMirror,
+  // fora da árvore React.
+  useEffect(() => {
+    function onStudyFlashcard() {
+      router.push(`/flashcards?noteId=${noteId}`);
+    }
+    window.addEventListener(FLASHCARD_STUDY_EVENT, onStudyFlashcard);
+    return () => window.removeEventListener(FLASHCARD_STUDY_EVENT, onStudyFlashcard);
+  }, [router, noteId]);
 
   const extensions = useMemo(
     () => [

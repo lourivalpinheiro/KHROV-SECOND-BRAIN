@@ -167,7 +167,7 @@
   flex: 1;
 }
 
-/* Destaque ao vivo dos flashcards (sintaxe "Pergunta >> Resposta" / "==") */
+/* Destaque ao vivo dos flashcards (sintaxe "Pergunta >> Resposta" / "==" / cloze) */
 .ProseMirror .flashcard-line {
   position: relative;
   margin-left: -0.75rem;
@@ -182,29 +182,39 @@
   border-left: 3px solid var(--chart-2);
   background: color-mix(in oklch, var(--chart-2) 10%, transparent);
 }
-.ProseMirror .flashcard-line::after {
-  content: "flashcard";
-  position: absolute;
-  top: 0.1em;
-  right: 0.1rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--primary);
-  opacity: 0.55;
-  pointer-events: none;
-}
-.ProseMirror .flashcard-multi::after {
-  color: var(--chart-2);
-}
 .ProseMirror .flashcard-cloze {
   border-left: 3px solid var(--chart-4);
   background: color-mix(in oklch, var(--chart-4) 8%, transparent);
 }
-.ProseMirror .flashcard-cloze::after {
-  content: "cloze";
+/* Ícone "ver nos flashcards" — inline no fim da linha, não sobrepõe o texto. */
+.flashcard-goto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-left: 0.35em;
+  vertical-align: middle;
+  border-radius: 999px;
+  color: var(--primary);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+.flashcard-multi ~ .flashcard-goto,
+.ProseMirror .flashcard-multi .flashcard-goto {
+  color: var(--chart-2);
+}
+.ProseMirror .flashcard-cloze .flashcard-goto {
   color: var(--chart-4);
+}
+.flashcard-goto svg {
+  width: 100%;
+  height: 100%;
+}
+.flashcard-goto:hover {
+  opacity: 1;
+  background: color-mix(in oklch, currentColor 15%, transparent);
 }
 .ProseMirror .flashcard-answers {
   margin-left: -0.75rem;
