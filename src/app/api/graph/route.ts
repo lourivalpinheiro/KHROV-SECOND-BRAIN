@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 
-/** Dados para a visualização de grafo: todas as notas e as ligações [[wikilink]] entre elas. */
+/**
+ * Dados para a visualização de grafo: todas as notas e as ligações
+ * [[wikilink]] entre elas. Fora do grafo: notas na lixeira, e notas de
+ * Córtex — são rascunho de sessão, ainda não processado, e poluiriam o
+ * grafo (que é sobre conexões entre conhecimento já elaborado).
+ */
 export async function GET() {
   try {
     const userId = await requireUserId();
 
+    const noteFilter = { userId, deletedAt: null, type: { not: "CORTEX" as const } };
+
     const [notes, links] = await Promise.all([
       prisma.note.findMany({
-        where: { userId },
+        where: noteFilter,
         select: {
           id: true,
           title: true,
@@ -17,7 +24,7 @@ export async function GET() {
         },
       }),
       prisma.noteLink.findMany({
-        where: { source: { userId } },
+        where: { source: noteFilter, target: noteFilter },
         select: { sourceNoteId: true, targetNoteId: true },
       }),
     ]);

@@ -112,7 +112,7 @@ export function NaneAssistant() {
         } else {
           await deleteJSON(`/api/notes/${pending.noteId}`);
           await mutate("/api/notes");
-          say(`Prontinho, excluí "${pending.title}".`);
+          say(`Prontinho, mandei "${pending.title}" pra lixeira. Fica lá 30 dias antes de sumir de vez.`);
           if (pathname === `/notes/${pending.noteId}`) router.push("/notes");
         }
       } catch (err) {

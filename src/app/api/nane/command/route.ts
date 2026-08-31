@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({
         intent: "delete_note",
-        reply: `Quer que eu exclua "${result.note.title}"? Isso não pode ser desfeito.`,
+        reply: `Quer que eu mande "${result.note.title}" pra lixeira? Fica lá 30 dias, dá pra restaurar.`,
         action: { type: "confirm_delete", noteId: result.note.id, title: result.note.title },
       });
     }

@@ -12,6 +12,8 @@ export type NoteListItem = {
   synthesisText: string | null;
   /** Preenchida só nas notas de Sessão (Córtex) — uma por dia por usuário. */
   dailyDate: string | null;
+  /** Preenchida quando a nota está na lixeira (soft delete) — null = ativa. */
+  deletedAt: string | null;
   updatedAt: string;
   createdAt: string;
   tags: { tag: TagDTO }[];

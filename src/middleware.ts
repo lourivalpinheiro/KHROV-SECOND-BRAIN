@@ -14,8 +14,14 @@ export default auth((req) => {
 
   const isAuthRoute = pathname === "/login";
   const isApiAuthRoute = pathname.startsWith("/api/auth");
+  // O Vercel Cron chama essas rotas direto, sem cookie de sessão nenhum —
+  // sem essa exceção, o middleware redirecionava a chamada pra /login antes
+  // dela sequer chegar no handler, e o cron nunca rodava de verdade. A
+  // autenticação de quem chama é feita dentro da própria rota, via
+  // CRON_SECRET (ver src/app/api/cron/purge-trash/route.ts).
+  const isApiCronRoute = pathname.startsWith("/api/cron/");
 
-  if (isApiAuthRoute) return NextResponse.next();
+  if (isApiAuthRoute || isApiCronRoute) return NextResponse.next();
 
   if (isAuthRoute) {
     if (isLoggedIn) {

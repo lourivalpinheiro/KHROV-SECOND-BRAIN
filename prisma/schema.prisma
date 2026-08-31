@@ -56,6 +56,13 @@ model Note {
    * Preenchido só pras notas diárias (uma por dia por usuário); null pro resto.
    */
   dailyDate     DateTime? @db.Date
+  /**
+   * Lixeira: null = nota ativa. Preenchido = foi excluída (soft delete) e
+   * some de todas as listas normais (notas, busca, flashcards, grafo), mas
+   * continua no banco por 30 dias — o cron de src/app/api/cron/purge-trash
+   * apaga de vez o que passou desse prazo sem ser restaurado.
+   */
+  deletedAt     DateTime?
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime  @default(now())
@@ -71,6 +78,7 @@ model Note {
 
   @@unique([userId, dailyDate])
   @@index([userId])
+  @@index([userId, deletedAt])
 }
 
 model Tag {

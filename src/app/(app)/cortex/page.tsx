@@ -103,16 +103,16 @@ export default function CortexPage() {
   async function removeNote(e: React.MouseEvent, note: NoteListItem) {
     e.stopPropagation();
     const ok = await confirm({
-      title: `Excluir "${note.title || "Sessão sem título"}"?`,
-      description: "Essa ação não pode ser desfeita.",
-      confirmLabel: "Excluir",
+      title: `Mover "${note.title || "Sessão sem título"}" pra lixeira?`,
+      description: "Fica lá por 30 dias — dá pra restaurar a qualquer momento antes disso.",
+      confirmLabel: "Mover pra lixeira",
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteJSON(`/api/notes/${note.id}`);
       await mutate(query);
-      toast.success("Sessão excluída.");
+      toast.success("Sessão movida pra lixeira.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir a sessão.");
     }

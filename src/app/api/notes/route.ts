@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const notes = await prisma.note.findMany({
       where: {
         userId,
+        deletedAt: null,
         ...(types.length ? { type: { in: types } } : {}),
         // exige que a nota tenha TODAS as tags selecionadas
         ...(allTagIds.length ? { AND: allTagIds.map((id) => ({ tags: { some: { tagId: id } } })) } : {}),

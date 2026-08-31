@@ -2,7 +2,18 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Brain, BrainCircuit, FileText, History, Layers, Network, Plus, Search, Tag as TagIcon } from "lucide-react";
+import {
+  Brain,
+  BrainCircuit,
+  FileText,
+  History,
+  Layers,
+  Network,
+  Plus,
+  Search,
+  Tag as TagIcon,
+  Trash2,
+} from "lucide-react";
 import { postJSON } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
@@ -137,6 +148,15 @@ export function AppSidebar({
               tooltip="Tags"
             >
               <TagIcon /> Tags
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={pathname === "/trash"}
+              onClick={() => router.push("/trash")}
+              tooltip="Lixeira"
+            >
+              <Trash2 /> Lixeira
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

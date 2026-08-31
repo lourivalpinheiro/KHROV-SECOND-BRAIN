@@ -8,7 +8,9 @@ export async function GET() {
     const tags = await prisma.tag.findMany({
       where: { userId },
       orderBy: { name: "asc" },
-      include: { _count: { select: { notes: true } } },
+      // Não conta notas na lixeira — senão o número mostrado em /tags ficava
+      // inflado com coisa que nem aparece mais em lugar nenhum.
+      include: { _count: { select: { notes: { where: { note: { deletedAt: null } } } } } },
     });
     return NextResponse.json(tags);
   } catch (res) {

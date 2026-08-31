@@ -493,20 +493,34 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   }
 
   async function removeNote() {
+    // Soft delete — a nota vai pra lixeira, não é apagada na hora (ver
+    // DELETE /api/notes/[id] e /trash). Por isso a confirmação é mais leve
+    // do que a de uma exclusão de vez.
     const ok = await confirm({
-      title: "Excluir esta nota?",
-      description: "Essa ação não pode ser desfeita.",
-      confirmLabel: "Excluir",
+      title: "Mover esta nota pra lixeira?",
+      description: "Fica lá por 30 dias — dá pra restaurar a qualquer momento antes disso.",
+      confirmLabel: "Mover pra lixeira",
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteJSON(key);
       await mutate("/api/notes");
-      toast.success("Nota excluída.");
+      toast.success("Nota movida pra lixeira.");
       router.push("/notes");
-    } catch {
-      toast.error("Erro ao excluir a nota.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao excluir a nota.");
+    }
+  }
+
+  async function restoreNote() {
+    try {
+      const updated = await postJSON<NoteDetail>(`/api/notes/${noteId}/restore`, {});
+      mutate(key, updated, { revalidate: false });
+      await mutate("/api/notes");
+      toast.success("Nota restaurada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao restaurar a nota.");
     }
   }
 
@@ -527,6 +541,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           isFullscreen && "max-w-4xl"
         )}
       >
+        {note.deletedAt && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+            <span className="text-destructive">Esta nota está na lixeira — vai ser apagada de vez em breve.</span>
+            <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={restoreNote}>
+              Restaurar
+            </Button>
+          </div>
+        )}
+
         <div className="mb-3 flex items-start justify-between gap-4">
           <input
             value={title}

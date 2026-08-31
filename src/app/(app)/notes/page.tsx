@@ -63,9 +63,9 @@ export default function NotesPage() {
   async function removeNote(e: React.MouseEvent, note: NoteListItem) {
     e.stopPropagation();
     const ok = await confirm({
-      title: `Excluir "${note.title || "Nota sem título"}"?`,
-      description: "Essa ação não pode ser desfeita.",
-      confirmLabel: "Excluir",
+      title: `Mover "${note.title || "Nota sem título"}" pra lixeira?`,
+      description: "Fica lá por 30 dias — dá pra restaurar a qualquer momento antes disso.",
+      confirmLabel: "Mover pra lixeira",
       destructive: true,
     });
     if (!ok) return;
@@ -73,7 +73,7 @@ export default function NotesPage() {
       await deleteJSON(`/api/notes/${note.id}`);
       await mutate(query);
       await mutate((key) => typeof key === "string" && key === "/api/tags");
-      toast.success("Nota excluída.");
+      toast.success("Nota movida pra lixeira.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir a nota.");
     }

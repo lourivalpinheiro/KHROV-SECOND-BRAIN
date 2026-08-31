@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const notes = await prisma.note.findMany({
       where: {
         userId,
+        deletedAt: null,
         ...(excludeId ? { id: { not: excludeId } } : {}),
         ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
       },

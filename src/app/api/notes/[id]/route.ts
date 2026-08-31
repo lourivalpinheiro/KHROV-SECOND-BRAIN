@@ -145,6 +145,7 @@ export async function PATCH(
   }
 }
 
+/** Soft delete — manda pra lixeira, some das listas normais, mas fica no banco por 30 dias (ver /api/notes/trash e /api/cron/purge-trash). */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -155,8 +156,9 @@ export async function DELETE(
 
     const existing = await getOwnedNote(id, userId);
     if (!existing) return jsonError("Nota não encontrada.", 404);
+    if (existing.deletedAt) return jsonError("Essa nota já está na lixeira.", 400);
 
-    await prisma.note.delete({ where: { id } });
+    await prisma.note.update({ where: { id }, data: { deletedAt: new Date() } });
 
     return NextResponse.json({ ok: true });
   } catch (res) {
