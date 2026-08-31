@@ -11,6 +11,7 @@ import {
   FileText,
   History,
   Layers,
+  LineChart,
   Network,
   NotebookPen,
   Plus,
@@ -236,45 +237,56 @@ export function AppSidebar({
             </SidebarMenu>
           </>
         ) : (
-          <SidebarGroup className="p-0 px-2">
-            <SidebarGroupLabel>Saúde</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
-                    <Activity /> Dashboard
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/semana"}
-                    onClick={() => router.push("/saude/semana")}
-                    tooltip="Semana"
-                  >
-                    <CalendarCheck2 /> Semana
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/caderno"}
-                    onClick={() => router.push("/saude/caderno")}
-                    tooltip="Caderno"
-                  >
-                    <NotebookPen /> Caderno
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/perfil"}
-                    onClick={() => router.push("/saude/perfil")}
-                    tooltip="Perfil"
-                  >
-                    <Settings2 /> Perfil
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <div className="theme-saude contents">
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Saúde</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
+                      <Activity /> Dashboard
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/semana"}
+                      onClick={() => router.push("/saude/semana")}
+                      tooltip="Semana"
+                    >
+                      <CalendarCheck2 /> Semana
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/caderno"}
+                      onClick={() => router.push("/saude/caderno")}
+                      tooltip="Caderno"
+                    >
+                      <NotebookPen /> Caderno
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/historico"}
+                      onClick={() => router.push("/saude/historico")}
+                      tooltip="Histórico"
+                    >
+                      <LineChart /> Histórico
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/perfil"}
+                      onClick={() => router.push("/saude/perfil")}
+                      tooltip="Perfil"
+                    >
+                      <Settings2 /> Perfil
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </div>
         )}
       </SidebarContent>
 

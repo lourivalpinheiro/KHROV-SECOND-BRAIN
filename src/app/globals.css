@@ -118,6 +118,23 @@
   --sidebar-ring: oklch(0.623 0.214 259.815);
 }
 
+/*
+ * Módulo Saúde: mesma casca visual do resto do Khrov, só troca o azul
+ * primário pelo vermelho do shadcn — reaproveita --destructive, que já
+ * está calibrado certinho pros dois temas (claro/escuro), em vez de
+ * inventar um valor novo. Escopado só no conteúdo/nav da Saúde (ver
+ * app-sidebar.tsx e saude/layout.tsx), o resto do app continua azul.
+ */
+.theme-saude {
+  --primary: var(--destructive);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: var(--destructive);
+  --sidebar-primary: var(--destructive);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent-foreground: var(--destructive);
+  --sidebar-ring: var(--destructive);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
