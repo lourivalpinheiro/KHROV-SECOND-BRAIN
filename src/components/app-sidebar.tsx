@@ -15,8 +15,7 @@ import {
   Tag as TagIcon,
   Trash2,
 } from "lucide-react";
-import { postJSON } from "@/lib/api-client";
-import { toast } from "sonner";
+import { useNewNote } from "@/hooks/use-new-note";
 import {
   Sidebar,
   SidebarContent,
@@ -41,20 +40,8 @@ export function AppSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [creating, setCreating] = useState(false);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
-
-  async function createNote() {
-    setCreating(true);
-    try {
-      const note = await postJSON<{ id: string }>("/api/notes", {});
-      router.push(`/notes/${note.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
-    } finally {
-      setCreating(false);
-    }
-  }
+  const { requestCreate, gateDialog } = useNewNote();
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -98,8 +85,7 @@ export function AppSidebar({
         <SidebarMenu className="gap-1 px-2">
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={createNote}
-              disabled={creating}
+              onClick={requestCreate}
               tooltip="Nova nota"
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
             >
@@ -209,6 +195,7 @@ export function AppSidebar({
       <SidebarFooter>
         <UserMenu name={user.name} email={user.email} image={user.image} />
       </SidebarFooter>
+      {gateDialog}
     </Sidebar>
   );
 }

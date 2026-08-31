@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { BookOpenText, Brain, FileText, History, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
+import { useNewNote } from "@/hooks/use-new-note";
 import {
   CommandDialog,
   CommandEmpty,
@@ -32,6 +33,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const { requestCreate, gateDialog } = useNewNote();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 200);
@@ -69,10 +71,9 @@ export function CommandPalette() {
     router.push(path);
   }
 
-  async function createNote() {
+  function createNote() {
     setOpen(false);
-    const note = await postJSON<{ id: string }>("/api/notes", {});
-    router.push(`/notes/${note.id}`);
+    requestCreate();
   }
 
   async function openDailyNote() {
@@ -82,6 +83,7 @@ export function CommandPalette() {
   }
 
   return (
+    <>
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
@@ -146,5 +148,7 @@ export function CommandPalette() {
         )}
       </CommandList>
     </CommandDialog>
+    {gateDialog}
+    </>
   );
 }

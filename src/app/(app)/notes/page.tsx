@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import { fetcher, postJSON, deleteJSON } from "@/lib/api-client";
+import { fetcher, deleteJSON } from "@/lib/api-client";
 import type { NoteListItem, TagDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,14 +13,8 @@ import { NotesFilterBar } from "@/components/notes-filter-bar";
 import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
 import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
-
-// Estímulo com menos que isso de texto puro conta como "vazio" — deixado
-// pelo caminho (criado via [[link]] ou extração, nunca desenvolvido).
-const EMPTY_THRESHOLD = 20;
-
-function isEmptyStimulus(note: NoteListItem) {
-  return note.type === "STIMULUS" && note.plainText.trim().length < EMPTY_THRESHOLD;
-}
+import { isEmptyStimulus } from "@/lib/note-health";
+import { useNewNote } from "@/hooks/use-new-note";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -59,14 +53,7 @@ export default function NotesPage() {
   const activeTag = tags?.find((t) => t.id === tagId);
   const heading = activeTag ? `#${activeTag.name}` : "Todas as notas";
 
-  async function createNote() {
-    try {
-      const note = await postJSON<{ id: string }>("/api/notes", {});
-      router.push(`/notes/${note.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar nota.");
-    }
-  }
+  const { requestCreate, gateDialog } = useNewNote();
 
   const emptyStimuli = useMemo(() => (notes ?? []).filter(isEmptyStimulus), [notes]);
 
@@ -112,7 +99,7 @@ export default function NotesPage() {
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{heading}</h1>
-          <Button onClick={createNote}>
+          <Button onClick={requestCreate}>
             <Plus /> Nova nota
           </Button>
         </div>
@@ -143,7 +130,7 @@ export default function NotesPage() {
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center text-muted-foreground">
             <FileText className="size-8" />
             <p>Nenhuma nota encontrada.</p>
-            <Button variant="outline" onClick={createNote}>
+            <Button variant="outline" onClick={requestCreate}>
               <Plus /> Criar nota
             </Button>
           </div>
@@ -178,6 +165,7 @@ export default function NotesPage() {
         </div>
       </div>
       {ConfirmDialog}
+      {gateDialog}
     </div>
   );
 }
