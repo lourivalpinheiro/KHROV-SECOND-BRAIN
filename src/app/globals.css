@@ -175,7 +175,8 @@
  * do navegador mostrando pergunta+resposta completas.
  */
 .ProseMirror .flashcard-line {
-  cursor: help;
+  /* Clicável (leva pros flashcards) quando não focada — daí o pointer. */
+  cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-color: var(--muted-foreground);
   text-underline-offset: 3px;
@@ -198,35 +199,30 @@
   color: var(--muted-foreground);
   font-style: italic;
 }
-/* Ícone "ver nos flashcards" — inline no fim da linha, não sobrepõe o texto. */
-.flashcard-goto {
+/* Badge discreto no fim da linha — só indicador visual (quem clica é a
+   linha inteira, ver handleClick em flashcard-highlight-extension.ts). */
+.flashcard-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.1em;
-  height: 1.1em;
-  margin-left: 0.35em;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.3em;
   vertical-align: middle;
-  border-radius: 999px;
   color: var(--muted-foreground);
-  opacity: 0.6;
-  cursor: pointer;
-  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+  opacity: 0.5;
+  pointer-events: none;
 }
-.flashcard-goto svg {
+.flashcard-badge svg {
   width: 100%;
   height: 100%;
-}
-.flashcard-goto:hover {
-  opacity: 1;
-  color: var(--primary);
-  background: color-mix(in oklch, var(--primary) 15%, transparent);
 }
 
 /* Conceito (":Termo::Definição") — mesma filosofia dos flashcards em
    texto puro: nada de callout, só um indício sutil de que tem algo ali. */
 .ProseMirror .concept-line {
-  cursor: help;
+  /* Clicável (leva ao glossário) quando não focado — daí o pointer. */
+  cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-color: var(--chart-2);
   text-underline-offset: 3px;
@@ -239,28 +235,23 @@
 .ProseMirror .concept-hidden {
   display: none;
 }
-.concept-goto {
+/* Badge discreto — só indicador visual (quem clica é a linha inteira,
+   ver handleClick em concept-highlight-extension.ts). */
+.concept-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.1em;
-  height: 1.1em;
-  margin-left: 0.35em;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.3em;
   vertical-align: middle;
-  border-radius: 999px;
-  color: var(--muted-foreground);
-  opacity: 0.6;
-  cursor: pointer;
-  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+  color: var(--chart-2);
+  opacity: 0.5;
+  pointer-events: none;
 }
-.concept-goto svg {
+.concept-badge svg {
   width: 100%;
   height: 100%;
-}
-.concept-goto:hover {
-  opacity: 1;
-  color: var(--chart-2);
-  background: color-mix(in oklch, var(--chart-2) 15%, transparent);
 }
 .ProseMirror .flashcard-answers {
   margin-left: -0.75rem;

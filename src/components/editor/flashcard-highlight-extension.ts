@@ -2,19 +2,29 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
 
 const CLOZE_RE = /\{\{c(\d+)::(.+?)\}\}/;
 const CLOZE_RE_G = /\{\{c\d+::(.+?)\}\}/g;
 
-/** Nome do evento disparado ao clicar no ícone "estudar" de uma linha reconhecida como flashcard — note-editor.tsx escuta e navega pra /flashcards. */
+/** Nome do evento disparado ao clicar numa linha reconhecida como flashcard — note-editor.tsx escuta e navega pra /flashcards. */
 export const FLASHCARD_STUDY_EVENT = "khrov:study-flashcard";
+
+type Kind = "simple" | "multi" | "cloze";
+
+function detectKind(text: string): Kind | null {
+  if (CLOZE_RE.test(text)) return "cloze";
+  if (text.endsWith("==") && text.length > 2) return "multi";
+  if (text.includes(">>")) return "simple";
+  return null;
+}
 
 function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 /** Pergunta + resposta(s) legíveis, pra usar como tooltip — não precisa ser exato, é só preview. */
-function previewFor(kind: "simple" | "multi" | "cloze", text: string): string {
+function previewFor(kind: Kind, text: string): string {
   if (kind === "cloze") {
     const answers = Array.from(text.matchAll(CLOZE_RE_G)).map((m) => m[1]);
     const question = text.replace(CLOZE_RE_G, "[...]");
@@ -27,25 +37,14 @@ function previewFor(kind: "simple" | "multi" | "cloze", text: string): string {
   return `${clip(question.trim(), 70)}\nResposta: ${clip((answer ?? "").trim(), 70)}`;
 }
 
-/** Botão pequeno "ir pra ele" — SVG desenhado na mão (sem depender de React/lucide, isto é DOM puro dentro do plugin). */
-function studyButtonWidget() {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "flashcard-goto";
-  button.title = "Ver nos flashcards";
-  button.contentEditable = "false";
-  button.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
-  button.addEventListener("mousedown", (e) => {
-    // Impede o clique de mover o cursor do editor pra dentro do texto antes do evento disparar.
-    e.preventDefault();
-  });
-  button.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    window.dispatchEvent(new CustomEvent(FLASHCARD_STUDY_EVENT));
-  });
-  return button;
+/** Badge pequeno e discreto (só um indicador visual — quem responde ao clique é o handleClick do plugin, não este elemento). */
+function badgeWidget() {
+  const span = document.createElement("span");
+  span.className = "flashcard-badge";
+  span.contentEditable = "false";
+  span.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>';
+  return span;
 }
 
 function clozePlaceholderWidget() {
@@ -60,11 +59,12 @@ function clozePlaceholderWidget() {
  * Destaca os parágrafos reconhecidos como flashcard (sintaxe
  * "Pergunta >> Resposta", "Pergunta ==" + lista de respostas abaixo, ou
  * cloze deletion "{{c1::resposta}}"). Enquanto o cursor NÃO está naquela
- * linha, esconde a parte de resposta — sobra só a pergunta, com um ícone
- * de seta que leva pra /flashcards, e passar o mouse mostra a
- * pergunta+resposta completas como tooltip nativo. Assim que o cursor
- * entra na linha, tudo volta a aparecer normal (sintaxe crua) pra dar pra
- * editar — nada disso muda o documento, é só CSS/DOM via decorations.
+ * linha, esconde a parte de resposta — sobra só a pergunta, como texto
+ * normal com um badge discreto, tooltip nativo (pergunta+resposta
+ * completas) e CLIQUE NO TEXTO leva pra /flashcards. Assim que o cursor
+ * entra na linha (clique numa linha já focada, ou navegação por
+ * teclado), tudo volta a aparecer normal (sintaxe crua) pra editar —
+ * nada disso muda o documento, é só CSS/DOM via decorations.
  */
 export const FlashcardHighlight = Extension.create({
   name: "flashcardHighlight",
@@ -103,6 +103,29 @@ export const FlashcardHighlight = Extension.create({
           };
         },
         props: {
+          // Clique numa linha de flashcard AINDA recolhida (não focada) navega
+          // pra /flashcards em vez de só posicionar o cursor — já que nesse
+          // estado não tem nada editável visível mesmo. Clicar numa linha que
+          // JÁ está focada (editando) continua posicionando o cursor normal.
+          handleClick(view: EditorView, pos: number) {
+            const hadFocus = key.getState(view.state)?.hasFocus ?? false;
+            const { from: selFrom, to: selTo } = view.state.selection;
+
+            const $pos = view.state.doc.resolve(pos);
+            if ($pos.parent.type.name !== "paragraph") return false;
+
+            const text = $pos.parent.textContent.trim();
+            const kind = detectKind(text);
+            if (!kind) return false;
+
+            const nodeFrom = $pos.before($pos.depth);
+            const nodeTo = nodeFrom + $pos.parent.nodeSize;
+            const wasFocused = hadFocus && selFrom < nodeTo && selTo > nodeFrom;
+            if (wasFocused) return false;
+
+            window.dispatchEvent(new CustomEvent(FLASHCARD_STUDY_EVENT));
+            return true;
+          },
           decorations(state) {
             const decorations: Decoration[] = [];
             const { hasFocus } = key.getState(state) ?? { hasFocus: false };
@@ -119,11 +142,7 @@ export const FlashcardHighlight = Extension.create({
 
                 if (!text) return;
 
-                let kind: "simple" | "multi" | "cloze" | null = null;
-                if (CLOZE_RE.test(text)) kind = "cloze";
-                else if (text.endsWith("==") && text.length > 2) kind = "multi";
-                else if (text.includes(">>")) kind = "simple";
-
+                const kind = detectKind(text);
                 if (!kind) return;
 
                 const nodeFrom = offset;
@@ -171,9 +190,9 @@ export const FlashcardHighlight = Extension.create({
                       decorations.push(Decoration.widget(to, clozePlaceholderWidget, { side: 1 }));
                     }
                   }
-                  // Ícone "ir pros flashcards" só quando não está editando — enquanto
-                  // edita, o fim da linha precisa ficar livre pra digitar.
-                  decorations.push(Decoration.widget(nodeTo - 1, studyButtonWidget, { side: 1 }));
+                  // Badge discreto no fim da linha — só indicador visual, o
+                  // clique é tratado pelo handleClick do plugin (acima).
+                  decorations.push(Decoration.widget(nodeTo - 1, badgeWidget, { side: 1 }));
                 }
 
                 if (kind === "multi") {
