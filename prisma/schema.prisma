@@ -20,6 +20,8 @@ model User {
   tags             Tag[]
   attachments      Attachment[]
   flashcardReviews FlashcardReview[]
+  healthProfile    HealthProfile?
+  healthDays       HealthDay[]
 }
 
 /**
@@ -153,4 +155,45 @@ model FlashcardReview {
 
   @@unique([noteId, cardKey])
   @@index([userId, dueAt])
+}
+
+/**
+ * Módulo Saúde — dados base pro cálculo de meta de água e estimativa de
+ * calorias (regras gerais, não é orientação médica). waterGoalBottles é a
+ * meta em garrafas de 1L (editável — sugerida a partir do peso, mas o
+ * usuário pode fixar o número que quiser, ex: 4). gymPlanDays usa a mesma
+ * convenção do Date.getDay() do JS (0=domingo..6=sábado), só pra
+ * sugerir/destacar os dias planejados na tabela semanal — a tabela em si
+ * mostra os 7 dias sempre, marcar um dia fora do plano não é bloqueado.
+ */
+model HealthProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg         Float
+  heightCm         Float
+  waterGoalBottles Int      @default(4)
+  gymPlanDays      Int[]    @default([1, 3, 5])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+/**
+ * Um registro por dia: quantas garrafas de 1L de água (0..meta, marcadas
+ * uma a uma), se foi pra academia, e as observações do treino daquele dia
+ * (o "Córtex" da Saúde).
+ */
+model HealthDay {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime @db.Date
+  waterBottles Int      @default(0)
+  gym          Boolean  @default(false)
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
