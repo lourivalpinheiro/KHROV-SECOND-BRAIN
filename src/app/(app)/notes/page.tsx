@@ -55,26 +55,6 @@ export default function NotesPage() {
 
   const { requestCreate, gateDialog } = useNewNote();
 
-  const emptyStimuli = useMemo(() => (notes ?? []).filter(isEmptyStimulus), [notes]);
-
-  async function clearEmptyStimuli() {
-    const ok = await confirm({
-      title: `Mover ${emptyStimuli.length} ${emptyStimuli.length === 1 ? "Estímulo vazio" : "Estímulos vazios"} pra lixeira?`,
-      description: "Fica lá por 30 dias — dá pra restaurar a qualquer momento antes disso.",
-      confirmLabel: "Mover pra lixeira",
-      destructive: true,
-    });
-    if (!ok) return;
-    try {
-      await Promise.all(emptyStimuli.map((n) => deleteJSON(`/api/notes/${n.id}`)));
-      await mutate(query);
-      await mutate((key) => typeof key === "string" && key === "/api/tags");
-      toast.success(`${emptyStimuli.length} ${emptyStimuli.length === 1 ? "nota movida" : "notas movidas"} pra lixeira.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao limpar os Estímulos vazios.");
-    }
-  }
-
   async function removeNote(e: React.MouseEvent, note: NoteListItem) {
     e.stopPropagation();
     const ok = await confirm({
@@ -105,18 +85,6 @@ export default function NotesPage() {
         </div>
 
         <NotesFilterBar />
-
-        {emptyStimuli.length > 0 && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2 text-sm">
-            <span className="text-muted-foreground">
-              {emptyStimuli.length} {emptyStimuli.length === 1 ? "Estímulo vazio" : "Estímulos vazios"} pelo
-              caminho — criados mas nunca desenvolvidos.
-            </span>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={clearEmptyStimuli}>
-              Limpar Estímulos vazios
-            </Button>
-          </div>
-        )}
 
         {isLoading && (
           <div className="space-y-3">
