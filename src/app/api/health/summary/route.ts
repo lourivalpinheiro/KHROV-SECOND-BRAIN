@@ -6,6 +6,7 @@ import {
   MAX_WORKOUT_MINUTES,
   computeWaterStreak,
   computeGymStreak,
+  computeSupplementStreak,
   weekDateKeys,
   toLocalDateKey,
 } from "@/lib/health";
@@ -28,17 +29,18 @@ export async function GET() {
 
     const rows = await prisma.healthDay.findMany({
       where: { userId, date: { gte: since } },
-      select: { date: true, waterBottles: true, gym: true },
+      select: { date: true, waterBottles: true, gym: true, supplement: true },
     });
     const history = rows.map((r) => ({
       date: r.date.toISOString().slice(0, 10),
       waterBottles: r.waterBottles,
       gym: r.gym,
+      supplement: r.supplement,
     }));
 
     const weekKeys = weekDateKeys(now);
     const byKey = new Map(history.map((h) => [h.date, h]));
-    const weekDays = weekKeys.map((key) => byKey.get(key) ?? { date: key, waterBottles: 0, gym: false });
+    const weekDays = weekKeys.map((key) => byKey.get(key) ?? { date: key, waterBottles: 0, gym: false, supplement: false });
 
     const litersThisWeek = weekDays.reduce((sum, d) => sum + d.waterBottles, 0);
     const daysWithWaterThisWeek = weekDays.filter((d) => d.waterBottles >= profile.waterGoalBottles).length;
@@ -50,14 +52,18 @@ export async function GET() {
       (d) => profile.gymPlanDays.includes(new Date(`${d.date}T00:00:00`).getDay()) && !d.gym && d.date < todayKey
     ).length;
 
+    const supplementDaysThisWeek = weekDays.filter((d) => d.supplement).length;
+
     return NextResponse.json({
       profile,
       litersThisWeek,
       daysWithWaterThisWeek,
       gymDaysAttendedThisWeek: gymDaysAttended,
       gymDaysMissedThisWeek: gymDaysMissed,
+      supplementDaysThisWeek,
       waterStreak: computeWaterStreak(history, now, profile.waterGoalBottles),
       gymStreak: computeGymStreak(history, now, profile.gymPlanDays),
+      supplementStreak: computeSupplementStreak(history, now),
       estimatedCalories: estimateWorkoutCalories(profile.weightKg, MAX_WORKOUT_MINUTES),
       maxWorkoutMinutes: MAX_WORKOUT_MINUTES,
     });

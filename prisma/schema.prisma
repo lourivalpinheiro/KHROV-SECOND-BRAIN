@@ -20,8 +20,9 @@ model User {
   tags             Tag[]
   attachments      Attachment[]
   flashcardReviews FlashcardReview[]
-  healthProfile    HealthProfile?
-  healthDays       HealthDay[]
+  healthProfile        HealthProfile?
+  healthDays           HealthDay[]
+  healthProfileHistory HealthProfileHistory[]
 }
 
 /**
@@ -180,8 +181,8 @@ model HealthProfile {
 
 /**
  * Um registro por dia: quantas garrafas de 1L de água (0..meta, marcadas
- * uma a uma), se foi pra academia, e as observações do treino daquele dia
- * (o "Córtex" da Saúde).
+ * uma a uma), se foi pra academia, se tomou a suplementação, e as
+ * observações do treino daquele dia (o "Córtex" da Saúde).
  */
 model HealthDay {
   id           String   @id @default(cuid())
@@ -190,10 +191,29 @@ model HealthDay {
   date         DateTime @db.Date
   waterBottles Int      @default(0)
   gym          Boolean  @default(false)
+  supplement   Boolean  @default(false)
   notes        String   @default("")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+/**
+ * Um snapshot toda vez que o perfil de saúde é salvo (peso, altura, metas)
+ * — histórico de longo prazo pra comparar evolução, já que a tabela da
+ * semana em si reseta toda segunda. Só cresce, nunca é editado.
+ */
+model HealthProfileHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg         Float
+  heightCm         Float
+  waterGoalBottles Int
+  gymPlanDays      Int[]
+  recordedAt       DateTime @default(now())
+
+  @@index([userId, recordedAt])
 }

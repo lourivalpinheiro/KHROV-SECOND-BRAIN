@@ -45,6 +45,12 @@ export async function PATCH(req: NextRequest) {
       create: { userId, weightKg, heightCm, gymPlanDays, waterGoalBottles },
     });
 
+    // Snapshot pro histórico de evolução — a cada save, não só na criação,
+    // pra registrar peso/altura/metas mudando ao longo do tempo.
+    await prisma.healthProfileHistory.create({
+      data: { userId, weightKg, heightCm, gymPlanDays, waterGoalBottles },
+    });
+
     return NextResponse.json(profile);
   } catch (res) {
     if (res instanceof NextResponse) return res;

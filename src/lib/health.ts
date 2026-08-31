@@ -65,7 +65,7 @@ export function weekDateKeys(d: Date): string[] {
   });
 }
 
-export type DayRecord = { date: string; waterBottles: number; gym: boolean };
+export type DayRecord = { date: string; waterBottles: number; gym: boolean; supplement?: boolean };
 
 /**
  * Streak de água: dias seguidos (terminando hoje ou ontem) batendo a meta
@@ -93,6 +93,20 @@ export function computeGymStreak(days: DayRecord[], today: Date, gymPlanDays: nu
     today,
     (d) => d.gym,
     (date) => planSet.has(date.getDay())
+  );
+}
+
+/**
+ * Streak de suplementação: dias seguidos marcados, mesma lógica da água
+ * (todo dia conta, sem "dias planejados" — é um hábito diário, não um
+ * plano de treino).
+ */
+export function computeSupplementStreak(days: DayRecord[], today: Date): number {
+  return computeStreak(
+    days,
+    today,
+    (d) => d.supplement === true,
+    () => true
   );
 }
 

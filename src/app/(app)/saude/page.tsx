@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { Activity, Droplets, Dumbbell, Flame, CalendarCheck2 } from "lucide-react";
+import { Activity, Droplets, Dumbbell, Flame, CalendarCheck2, Pill, LineChart } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +14,10 @@ type Summary = {
   daysWithWaterThisWeek?: number;
   gymDaysAttendedThisWeek?: number;
   gymDaysMissedThisWeek?: number;
+  supplementDaysThisWeek?: number;
   waterStreak?: number;
   gymStreak?: number;
+  supplementStreak?: number;
   estimatedCalories?: number;
   maxWorkoutMinutes?: number;
 };
@@ -104,7 +106,7 @@ export default function SaudeDashboardPage() {
 
         {/* Situação atual */}
         <h2 className="mb-3 text-sm font-semibold tracking-tight text-muted-foreground">Sua situação esta semana</h2>
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             icon={Droplets}
             label="Água tomada"
@@ -124,6 +126,13 @@ export default function SaudeDashboardPage() {
             accent="text-chart-2"
           />
           <StatCard
+            icon={Pill}
+            label="Suplementação"
+            value={`${summary.supplementDaysThisWeek}/7`}
+            sub="dias marcados na semana"
+            accent="text-chart-4"
+          />
+          <StatCard
             icon={CalendarCheck2}
             label="Streak de água"
             value={`${summary.waterStreak} ${summary.waterStreak === 1 ? "dia" : "dias"}`}
@@ -136,6 +145,13 @@ export default function SaudeDashboardPage() {
             value={`${summary.gymStreak} ${summary.gymStreak === 1 ? "dia" : "dias"}`}
             sub="planejados seguidos sem falta"
             accent="text-chart-2"
+          />
+          <StatCard
+            icon={CalendarCheck2}
+            label="Streak de suplemento"
+            value={`${summary.supplementStreak} ${summary.supplementStreak === 1 ? "dia" : "dias"}`}
+            sub="seguidos sem esquecer"
+            accent="text-chart-4"
           />
         </div>
 
@@ -151,12 +167,15 @@ export default function SaudeDashboardPage() {
           </p>
         </div>
 
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex flex-wrap gap-2">
           <Button variant="outline" render={<Link href="/saude/semana" />}>
             Ver semana
           </Button>
           <Button variant="outline" render={<Link href="/saude/caderno" />}>
             Abrir caderno
+          </Button>
+          <Button variant="outline" render={<Link href="/saude/historico" />}>
+            <LineChart /> Histórico
           </Button>
         </div>
       </div>

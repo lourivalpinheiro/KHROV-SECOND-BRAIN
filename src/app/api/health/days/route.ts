@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         date: key,
         waterBottles: row?.waterBottles ?? 0,
         gym: row?.gym ?? false,
+        supplement: row?.supplement ?? false,
         notes: row?.notes ?? "",
       };
     });
@@ -48,11 +49,12 @@ export async function PATCH(req: NextRequest) {
     const dateStr = typeof body.date === "string" && DATE_RE.test(body.date) ? body.date : null;
     if (!dateStr) return jsonError("Data inválida.");
 
-    const data: { waterBottles?: number; gym?: boolean; notes?: string } = {};
+    const data: { waterBottles?: number; gym?: boolean; supplement?: boolean; notes?: string } = {};
     if (Number.isInteger(body.waterBottles) && body.waterBottles >= 0 && body.waterBottles <= 20) {
       data.waterBottles = body.waterBottles;
     }
     if (typeof body.gym === "boolean") data.gym = body.gym;
+    if (typeof body.supplement === "boolean") data.supplement = body.supplement;
     if (typeof body.notes === "string") data.notes = body.notes;
 
     const date = new Date(`${dateStr}T00:00:00.000Z`);
@@ -64,6 +66,7 @@ export async function PATCH(req: NextRequest) {
         date,
         waterBottles: data.waterBottles ?? 0,
         gym: data.gym ?? false,
+        supplement: data.supplement ?? false,
         notes: data.notes ?? "",
       },
     });
@@ -72,6 +75,7 @@ export async function PATCH(req: NextRequest) {
       date: dateStr,
       waterBottles: day.waterBottles,
       gym: day.gym,
+      supplement: day.supplement,
       notes: day.notes,
     });
   } catch (res) {
