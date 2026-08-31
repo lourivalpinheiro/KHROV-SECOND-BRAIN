@@ -201,7 +201,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     async (content: unknown, opts?: SaveOpts) => {
       setSaveState("saving");
       try {
-        await patchJSON(key, { content }, opts);
+        const updated = await patchJSON<NoteDetail>(key, { content }, opts);
+        // Sem isto, o cache do SWR pra esta nota nunca era atualizado depois
+        // de salvar — só a lista (/api/notes) era revalidada. Resultado: ao
+        // sair da nota e voltar (remonta o componente, key={id} força isso),
+        // o useSWR devolvia na hora o snapshot ANTIGO (de antes da edição)
+        // que ainda estava em cache, e o guard de "carregar só uma vez por
+        // id" nunca deixava o conteúdo salvo de verdade ser aplicado — como
+        // se nada tivesse sido salvo, mesmo com o PATCH tendo funcionado.
+        if (updated) mutate(key, updated, { revalidate: false });
         setSaveState("saved");
       } catch {
         // Não deixa o indicador preso em "Salvando..." pra sempre — melhor
@@ -218,7 +226,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     async (value: string, opts?: SaveOpts) => {
       setSaveState("saving");
       try {
-        await patchJSON(key, { title: value }, opts);
+        const updated = await patchJSON<NoteDetail>(key, { title: value }, opts);
+        if (updated) mutate(key, updated, { revalidate: false });
         await mutate("/api/notes");
         setSaveState("saved");
       } catch {
@@ -291,7 +300,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setTags(newTags);
     setSaveState("saving");
     try {
-      await patchJSON(key, { tags: newTags });
+      const updated = await patchJSON<NoteDetail>(key, { tags: newTags });
+      if (updated) mutate(key, updated, { revalidate: false });
       await mutate("/api/tags");
       setSaveState("saved");
     } catch {
@@ -332,10 +342,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     if (newSynthesisText !== undefined) setSynthesisText(newSynthesisText);
     setSaveState("saving");
     try {
-      await patchJSON(key, {
+      const updated = await patchJSON<NoteDetail>(key, {
         type: newType,
         ...(newSynthesisText !== undefined ? { synthesisText: newSynthesisText } : {}),
       });
+      if (updated) mutate(key, updated, { revalidate: false });
       await mutate("/api/notes");
       setSaveState("saved");
       toast.success(`Nota movida para "${NOTE_TYPE_META[newType].label}".`);
