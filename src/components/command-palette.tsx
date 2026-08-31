@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Brain, FileText, History, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
+import { BookOpenText, Brain, FileText, History, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
 import {
@@ -113,6 +113,9 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => go("/timeline")}>
             <History /> Linha do tempo
+          </CommandItem>
+          <CommandItem onSelect={() => go("/conceitos")}>
+            <BookOpenText /> Conceitos
           </CommandItem>
         </CommandGroup>
 

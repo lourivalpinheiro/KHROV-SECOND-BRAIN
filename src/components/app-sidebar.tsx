@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
+  BookOpenText,
   Brain,
   BrainCircuit,
   FileText,
@@ -158,6 +159,15 @@ export function AppSidebar({
                   tooltip="Tags"
                 >
                   <TagIcon /> Tags
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/conceitos"}
+                  onClick={() => router.push("/conceitos")}
+                  tooltip="Conceitos"
+                >
+                  <BookOpenText /> Conceitos
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -38,6 +38,7 @@ import { extractFlashcards } from "@/lib/flashcards";
 import type { NoteDetail } from "@/types/models";
 import { createWikiLinkExtension } from "./wiki-link-extension";
 import { FlashcardHighlight, FLASHCARD_STUDY_EVENT } from "./flashcard-highlight-extension";
+import { ConceptHighlight, CONCEPT_STUDY_EVENT } from "./concept-highlight-extension";
 import { Flashcard } from "./flashcard-node";
 import { Bookmark } from "./bookmark-node";
 import { EditorToolbar } from "./toolbar";
@@ -163,6 +164,18 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     return () => window.removeEventListener(FLASHCARD_STUDY_EVENT, onStudyFlashcard);
   }, [router, noteId]);
 
+  // Disparado pelo ícone de um conceito reconhecido (ver
+  // concept-highlight-extension.ts) — leva pro glossário já com o termo
+  // em foco.
+  useEffect(() => {
+    function onGotoConcept(e: Event) {
+      const term = (e as CustomEvent<{ term: string }>).detail?.term;
+      router.push(term ? `/conceitos?termo=${encodeURIComponent(term)}` : "/conceitos");
+    }
+    window.addEventListener(CONCEPT_STUDY_EVENT, onGotoConcept);
+    return () => window.removeEventListener(CONCEPT_STUDY_EVENT, onGotoConcept);
+  }, [router]);
+
   const extensions = useMemo(
     () => [
       StarterKit.configure({ link: false, underline: false }),
@@ -179,6 +192,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       Placeholder.configure({ placeholder: "Escreva algo... use [[ para linkar outra nota" }),
       createWikiLinkExtension(noteId),
       FlashcardHighlight,
+      ConceptHighlight,
       Flashcard,
       Bookmark,
     ],

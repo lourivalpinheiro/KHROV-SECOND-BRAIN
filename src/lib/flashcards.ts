@@ -1,4 +1,5 @@
 import type { TiptapDoc } from "@/lib/doc-utils";
+import { matchConcept } from "@/lib/concepts";
 
 export type Flashcard = {
   id: string;
@@ -74,6 +75,8 @@ function extractClozeCards(text: string, nextId: () => string): Flashcard[] {
  *    o trecho marcado, mantém o resto do parágrafo como contexto. Vários
  *    `{{c1::...}}` no mesmo parágrafo viram respostas do mesmo card;
  *    números diferentes (`c1`, `c2`...) viram cards separados.
+ * 4. Conceitos: `:Termo::Definição` (ver concepts.ts) — vira "O que é
+ *    Termo?" / Definição, além de entrar no glossário em /conceitos.
  */
 export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[] {
   const cards: Flashcard[] = [];
@@ -101,6 +104,19 @@ export function extractFlashcards(doc: TiptapDoc | null | undefined): Flashcard[
         lastWasMultiQuestion = null;
 
         if (!text) continue;
+
+        const concept = matchConcept(text);
+        if (concept) {
+          if (concept.definition) {
+            cards.push({
+              id: nextId(),
+              key: keyFor(`concept:${concept.term}`),
+              question: `O que é ${concept.term}?`,
+              answers: [concept.definition],
+            });
+          }
+          continue;
+        }
 
         CLOZE_RE.lastIndex = 0;
         if (CLOZE_RE.test(text)) {
