@@ -64,7 +64,11 @@ export function AppSidebar({
     <Sidebar collapsible="icon">
       <SidebarHeader className="gap-3">
         <div className="flex items-center gap-2 pt-1">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          {/* size-8 pra bater exatamente com o tamanho que o SidebarMenuButton
+              vira no modo colapsado (ícone) — com tamanhos diferentes, os dois
+              ficam centralizados em caixas de larguras diferentes, e o ícone
+              do logo sai levemente deslocado em relação aos ícones abaixo. */}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <BrainCircuit className="size-4" />
           </div>
           <span className="truncate font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
