@@ -49,6 +49,7 @@ import { NOTE_TYPE_META, MIN_SYNTHESIS_LENGTH, checkPromotion, type NoteTypeValu
 import { extractPlainText, extractLinkedNoteIds } from "@/lib/doc-utils";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
+import { NoteToc } from "./note-toc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -561,6 +562,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         isFullscreen && "fixed inset-0 z-50 bg-background"
       )}
     >
+      <NoteToc editor={editor} />
       <div
         className={cn(
           "mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8",
