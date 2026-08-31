@@ -48,14 +48,23 @@ function studyButtonWidget() {
   return button;
 }
 
+function clozePlaceholderWidget() {
+  const span = document.createElement("span");
+  span.className = "flashcard-cloze-blank";
+  span.textContent = "[...]";
+  span.contentEditable = "false";
+  return span;
+}
+
 /**
- * Destaca visualmente, em tempo real, os parágrafos reconhecidos como
- * flashcard (sintaxe "Pergunta >> Resposta", "Pergunta ==" + lista de
- * respostas abaixo, ou cloze deletion "{{c1::resposta}}") — só CSS/DOM via
- * decorations, não altera o documento. Passa a mão no mouse mostra um
- * preview de pergunta/resposta (tooltip nativo), e um ícone de seta no
- * fim da linha leva pra "Flashcards desta nota" sem interferir no clique
- * normal de posicionar o cursor pra editar.
+ * Destaca os parágrafos reconhecidos como flashcard (sintaxe
+ * "Pergunta >> Resposta", "Pergunta ==" + lista de respostas abaixo, ou
+ * cloze deletion "{{c1::resposta}}"). Enquanto o cursor NÃO está naquela
+ * linha, esconde a parte de resposta — sobra só a pergunta, com um ícone
+ * de seta que leva pra /flashcards, e passar o mouse mostra a
+ * pergunta+resposta completas como tooltip nativo. Assim que o cursor
+ * entra na linha, tudo volta a aparecer normal (sintaxe crua) pra dar pra
+ * editar — nada disso muda o documento, é só CSS/DOM via decorations.
  */
 export const FlashcardHighlight = Extension.create({
   name: "flashcardHighlight",
@@ -67,12 +76,16 @@ export const FlashcardHighlight = Extension.create({
         props: {
           decorations(state) {
             const decorations: Decoration[] = [];
+            const { from: selFrom, to: selTo } = state.selection;
             let lastWasMultiQuestion = false;
+            let lastMultiRange: { from: number; to: number } | null = null;
 
             state.doc.forEach((node: ProseMirrorNode, offset: number) => {
               if (node.type.name === "paragraph") {
-                const text = node.textContent.trim();
+                const raw = node.textContent;
+                const text = raw.trim();
                 lastWasMultiQuestion = false;
+                lastMultiRange = null;
 
                 if (!text) return;
 
@@ -83,28 +96,78 @@ export const FlashcardHighlight = Extension.create({
 
                 if (!kind) return;
 
+                const nodeFrom = offset;
+                const nodeTo = offset + node.nodeSize;
+                // Cursor/seleção tocando esta linha = modo edição, mostra tudo cru.
+                const isFocused = selFrom < nodeTo && selTo > nodeFrom;
+                const paraStart = offset + 1; // primeira posição de texto dentro do parágrafo
+
                 decorations.push(
-                  Decoration.node(offset, offset + node.nodeSize, {
-                    class: `flashcard-line flashcard-${kind}`,
+                  Decoration.node(nodeFrom, nodeTo, {
+                    class: `flashcard-line flashcard-${kind}${isFocused ? " flashcard-editing" : ""}`,
                     title: previewFor(kind, text),
                   })
                 );
-                // Widget no fim do parágrafo (offset + nodeSize - 1 = logo antes do fechamento do node).
-                decorations.push(Decoration.widget(offset + node.nodeSize - 1, studyButtonWidget, { side: 1 }));
 
-                if (kind === "multi") lastWasMultiQuestion = true;
+                if (!isFocused) {
+                  if (kind === "simple") {
+                    const idx = raw.indexOf(">>");
+                    if (idx !== -1) {
+                      decorations.push(
+                        Decoration.inline(paraStart + idx, paraStart + raw.length, {
+                          class: "flashcard-hidden",
+                        })
+                      );
+                    }
+                  } else if (kind === "multi") {
+                    const idx = raw.lastIndexOf("==");
+                    if (idx !== -1) {
+                      decorations.push(
+                        Decoration.inline(paraStart + idx, paraStart + raw.length, {
+                          class: "flashcard-hidden",
+                        })
+                      );
+                    }
+                  } else if (kind === "cloze") {
+                    // Esconde só o miolo "resposta" de cada {{cN::resposta}}, mantendo
+                    // o resto da frase visível — e desenha um "[...]" no lugar.
+                    const clozeRe = /\{\{c\d+::(.+?)\}\}/g;
+                    let match: RegExpExecArray | null;
+                    while ((match = clozeRe.exec(raw))) {
+                      const from = paraStart + match.index;
+                      const to = from + match[0].length;
+                      decorations.push(Decoration.inline(from, to, { class: "flashcard-hidden" }));
+                      decorations.push(Decoration.widget(to, clozePlaceholderWidget, { side: 1 }));
+                    }
+                  }
+                  // Ícone "ir pros flashcards" só quando não está editando — enquanto
+                  // edita, o fim da linha precisa ficar livre pra digitar.
+                  decorations.push(Decoration.widget(nodeTo - 1, studyButtonWidget, { side: 1 }));
+                }
+
+                if (kind === "multi") {
+                  lastWasMultiQuestion = true;
+                  lastMultiRange = { from: nodeFrom, to: nodeTo };
+                }
               } else if (
                 lastWasMultiQuestion &&
                 (node.type.name === "bulletList" || node.type.name === "orderedList")
               ) {
+                const nodeFrom = offset;
+                const nodeTo = offset + node.nodeSize;
+                const questionFocused =
+                  lastMultiRange !== null && selFrom < lastMultiRange.to && selTo > lastMultiRange.from;
+                const listFocused = selFrom < nodeTo && selTo > nodeFrom;
                 decorations.push(
-                  Decoration.node(offset, offset + node.nodeSize, {
-                    class: "flashcard-answers",
+                  Decoration.node(nodeFrom, nodeTo, {
+                    class: `flashcard-answers${questionFocused || listFocused ? "" : " flashcard-hidden-node"}`,
                   })
                 );
                 lastWasMultiQuestion = false;
+                lastMultiRange = null;
               } else {
                 lastWasMultiQuestion = false;
+                lastMultiRange = null;
               }
             });
 
