@@ -61,7 +61,7 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className={cn(activeModule === "saude" && "theme-saude")}>
       <SidebarHeader className="gap-3">
         <div className="flex items-center gap-2 pt-1">
           {/* size-8 pra bater exatamente com o tamanho que o SidebarMenuButton
@@ -237,56 +237,54 @@ export function AppSidebar({
             </SidebarMenu>
           </>
         ) : (
-          <div className="theme-saude contents">
-            <SidebarGroup className="p-0 px-2">
-              <SidebarGroupLabel>Saúde</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-1">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
-                      <Activity /> Dashboard
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={pathname === "/saude/semana"}
-                      onClick={() => router.push("/saude/semana")}
-                      tooltip="Semana"
-                    >
-                      <CalendarCheck2 /> Semana
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={pathname === "/saude/caderno"}
-                      onClick={() => router.push("/saude/caderno")}
-                      tooltip="Caderno"
-                    >
-                      <NotebookPen /> Caderno
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={pathname === "/saude/historico"}
-                      onClick={() => router.push("/saude/historico")}
-                      tooltip="Histórico"
-                    >
-                      <LineChart /> Histórico
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={pathname === "/saude/perfil"}
-                      onClick={() => router.push("/saude/perfil")}
-                      tooltip="Perfil"
-                    >
-                      <Settings2 /> Perfil
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </div>
+          <SidebarGroup className="p-0 px-2">
+            <SidebarGroupLabel>Saúde</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
+                    <Activity /> Dashboard
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/saude/semana"}
+                    onClick={() => router.push("/saude/semana")}
+                    tooltip="Semana"
+                  >
+                    <CalendarCheck2 /> Semana
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/saude/caderno"}
+                    onClick={() => router.push("/saude/caderno")}
+                    tooltip="Caderno"
+                  >
+                    <NotebookPen /> Caderno
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/saude/historico"}
+                    onClick={() => router.push("/saude/historico")}
+                    tooltip="Histórico"
+                  >
+                    <LineChart /> Histórico
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/saude/perfil"}
+                    onClick={() => router.push("/saude/perfil")}
+                    tooltip="Perfil"
+                  >
+                    <Settings2 /> Perfil
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
       </SidebarContent>
 

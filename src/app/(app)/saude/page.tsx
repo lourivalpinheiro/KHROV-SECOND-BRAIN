@@ -95,8 +95,8 @@ export default function SaudeDashboardPage() {
               {summary.profile.waterGoalBottles}L de 1L cada — ajustável no perfil.
             </p>
           </div>
-          <div className="rounded-xl border border-chart-2/30 bg-chart-2/5 p-4">
-            <div className="mb-1 flex items-center gap-2 text-sm font-medium text-chart-2">
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm font-medium text-primary">
               <Dumbbell className="size-4" /> Meta de academia
             </div>
             <p className="text-2xl font-semibold tracking-tight">{summary.profile.gymPlanDays.length}x / semana</p>
@@ -123,14 +123,14 @@ export default function SaudeDashboardPage() {
                 ? `${summary.gymDaysMissedThisWeek} ${summary.gymDaysMissedThisWeek === 1 ? "falta" : "faltas"} planejada(s)`
                 : "Sem faltas até agora"
             }
-            accent="text-chart-2"
+            accent="text-primary"
           />
           <StatCard
             icon={Pill}
             label="Suplementação"
             value={`${summary.supplementDaysThisWeek}/7`}
             sub="dias marcados na semana"
-            accent="text-chart-4"
+            accent="text-primary"
           />
           <StatCard
             icon={CalendarCheck2}
@@ -144,21 +144,21 @@ export default function SaudeDashboardPage() {
             label="Streak de academia"
             value={`${summary.gymStreak} ${summary.gymStreak === 1 ? "dia" : "dias"}`}
             sub="planejados seguidos sem falta"
-            accent="text-chart-2"
+            accent="text-primary"
           />
           <StatCard
             icon={CalendarCheck2}
             label="Streak de suplemento"
             value={`${summary.supplementStreak} ${summary.supplementStreak === 1 ? "dia" : "dias"}`}
             sub="seguidos sem esquecer"
-            accent="text-chart-4"
+            accent="text-primary"
           />
         </div>
 
         {/* Estimativa de calorias */}
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-1 flex items-center gap-2 text-sm font-medium">
-            <Flame className="size-4 text-chart-4" /> Estimativa de calorias
+            <Flame className="size-4 text-primary" /> Estimativa de calorias
           </div>
           <p className="text-2xl font-semibold tracking-tight">~{summary.estimatedCalories} kcal</p>
           <p className="mt-1 text-xs text-muted-foreground">

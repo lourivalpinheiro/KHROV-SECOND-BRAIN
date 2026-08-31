@@ -40,6 +40,11 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  /** Preview temporário (hover no ícone de expandir) — sobrepõe o conteúdo
+   * sem mudar o estado persistido nem empurrar o layout. Ver openPreview/closePreview. */
+  previewOpen: boolean
+  openPreview: () => void
+  closePreview: () => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -68,6 +73,33 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+
+  // Preview temporário (hover no ícone de expandir, ver SidebarTrigger) —
+  // um pequeno atraso ao fechar evita flicker quando o mouse passa do
+  // ícone pro conteúdo da sidebar em si.
+  const [previewOpen, setPreviewOpenState] = React.useState(false)
+  const previewTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const openPreview = React.useCallback(() => {
+    if (previewTimeout.current) {
+      clearTimeout(previewTimeout.current)
+      previewTimeout.current = null
+    }
+    setPreviewOpenState(true)
+  }, [])
+
+  const closePreview = React.useCallback(() => {
+    if (previewTimeout.current) clearTimeout(previewTimeout.current)
+    previewTimeout.current = setTimeout(() => {
+      setPreviewOpenState(false)
+    }, 200)
+  }, [])
+
+  React.useEffect(() => {
+    return () => {
+      if (previewTimeout.current) clearTimeout(previewTimeout.current)
+    }
+  }, [])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -122,8 +154,11 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      previewOpen,
+      openPreview,
+      closePreview,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, previewOpen, openPreview, closePreview]
   )
 
   return (
@@ -162,7 +197,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, previewOpen, openPreview, closePreview } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -187,7 +222,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className={cn("w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden", className)}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -209,11 +244,24 @@ function Sidebar({
     )
   }
 
+  // Preview de hover: enquanto colapsada, passar o mouse no ícone de
+  // expandir (SidebarTrigger, no header do app) ou na própria sidebar
+  // "acorda" ela temporariamente como se estivesse expandida — só
+  // visualmente (sidebar-container é fixed, então sobrepõe o conteúdo em
+  // vez de empurrá-lo). O "gap" que reserva espaço no layout continua
+  // baseado no estado de verdade (data-collapsible-gap), então nada pula
+  // de lugar enquanto isso.
+  const isPreviewing = previewOpen && state === "collapsed"
+  const visualState = isPreviewing ? "expanded" : state
+  const visualCollapsible = visualState === "collapsed" ? collapsible : ""
+  const trueCollapsible = state === "collapsed" ? collapsible : ""
+
   return (
     <div
       className="group peer hidden text-sidebar-foreground md:block"
-      data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      data-state={visualState}
+      data-collapsible={visualCollapsible}
+      data-collapsible-gap={trueCollapsible}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
@@ -223,22 +271,25 @@ function Sidebar({
         data-slot="sidebar-gap"
         className={cn(
           "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
-          "group-data-[collapsible=offcanvas]:w-0",
+          "group-data-[collapsible-gap=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+            ? "group-data-[collapsible-gap=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
+            : "group-data-[collapsible-gap=icon]:w-(--sidebar-width-icon)"
         )}
       />
       <div
         data-slot="sidebar-container"
         data-side={side}
+        onMouseEnter={!isMobile ? openPreview : undefined}
+        onMouseLeave={!isMobile ? closePreview : undefined}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width,box-shadow] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+          isPreviewing && "shadow-2xl",
           className
         )}
         {...props}
@@ -258,9 +309,11 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, openPreview, closePreview } = useSidebar()
 
   return (
     <Button
@@ -268,10 +321,24 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
-      className={cn(className)}
+      // z-index acima do sidebar-container (z-10) — sem isso, quando a
+      // sidebar colapsada "acorda" em preview (mais larga que o header à
+      // esquerda), ela sobrepõe visualmente este botão e rouba o clique.
+      className={cn("relative z-20", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
+      }}
+      // Passa o mouse aqui com a sidebar colapsada = dá uma espiada no
+      // conteúdo cheio (com labels) sem precisar clicar pra expandir de
+      // verdade — ver openPreview/closePreview em sidebar.tsx.
+      onMouseEnter={(event) => {
+        onMouseEnter?.(event)
+        openPreview()
+      }}
+      onMouseLeave={(event) => {
+        onMouseLeave?.(event)
+        closePreview()
       }}
       {...props}
     >

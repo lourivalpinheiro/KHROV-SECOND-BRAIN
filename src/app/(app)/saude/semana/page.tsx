@@ -166,9 +166,9 @@ export default function SemanaSaudePage() {
                     className={cn(
                       "flex size-8 items-center justify-center rounded-lg border-2 transition-colors",
                       d.gym
-                        ? "border-chart-2 bg-chart-2 text-white"
+                        ? "border-primary bg-primary text-white"
                         : planned
-                          ? "border-chart-2/50 text-chart-2/60"
+                          ? "border-primary/50 text-primary/60"
                           : "border-dashed text-muted-foreground/40"
                     )}
                   >
@@ -180,7 +180,7 @@ export default function SemanaSaudePage() {
                     title="Suplementação"
                     className={cn(
                       "flex size-8 items-center justify-center rounded-lg border-2 transition-colors",
-                      d.supplement ? "border-chart-4 bg-chart-4 text-white" : "border-dashed text-muted-foreground/40"
+                      d.supplement ? "border-primary bg-primary text-white" : "border-dashed text-muted-foreground/40"
                     )}
                   >
                     {d.supplement ? <Check className="size-4" /> : <Pill className="size-3.5" />}
@@ -237,10 +237,10 @@ export default function SemanaSaudePage() {
                         className={cn(
                           "mx-auto flex size-8 items-center justify-center rounded-lg border-2 transition-colors",
                           d.gym
-                            ? "border-chart-2 bg-chart-2 text-white"
+                            ? "border-primary bg-primary text-white"
                             : planned
-                              ? "border-chart-2/50 text-chart-2/60 hover:border-chart-2"
-                              : "border-dashed text-muted-foreground/40 hover:border-chart-2/40"
+                              ? "border-primary/50 text-primary/60 hover:border-primary"
+                              : "border-dashed text-muted-foreground/40 hover:border-primary/40"
                         )}
                       >
                         {d.gym && <Check className="size-4" />}
@@ -262,8 +262,8 @@ export default function SemanaSaudePage() {
                       className={cn(
                         "mx-auto flex size-8 items-center justify-center rounded-lg border-2 transition-colors",
                         d.supplement
-                          ? "border-chart-4 bg-chart-4 text-white"
-                          : "border-dashed text-muted-foreground/40 hover:border-chart-4/40"
+                          ? "border-primary bg-primary text-white"
+                          : "border-dashed text-muted-foreground/40 hover:border-primary/40"
                       )}
                     >
                       {d.supplement && <Check className="size-4" />}
