@@ -161,15 +161,6 @@ export function AppSidebar({
                   <TagIcon /> Tags
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={pathname === "/conceitos"}
-                  onClick={() => router.push("/conceitos")}
-                  tooltip="Conceitos"
-                >
-                  <BookOpenText /> Conceitos
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -185,6 +176,15 @@ export function AppSidebar({
                   tooltip="Flashcards"
                 >
                   <Layers /> Flashcards
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/conceitos"}
+                  onClick={() => router.push("/conceitos")}
+                  tooltip="Conceitos"
+                >
+                  <BookOpenText /> Conceitos
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
