@@ -67,8 +67,10 @@ import {
 import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
 
+type SaveOpts = { keepalive?: boolean };
+
 function useDebouncedCallback<Args extends unknown[]>(
-  fn: (...args: Args) => void,
+  fn: (...args: [...Args, SaveOpts?]) => void,
   delay: number
 ) {
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,13 +81,13 @@ function useDebouncedCallback<Args extends unknown[]>(
     fnRef.current = fn;
   }, [fn]);
 
-  const flush = useCallback(() => {
+  const flush = useCallback((opts?: SaveOpts) => {
     if (timeout.current && pendingArgs.current) {
       clearTimeout(timeout.current);
       timeout.current = null;
       const args = pendingArgs.current;
       pendingArgs.current = null;
-      return fnRef.current(...args);
+      return fnRef.current(...args, opts);
     }
   }, []);
 
@@ -96,7 +98,7 @@ function useDebouncedCallback<Args extends unknown[]>(
       timeout.current = setTimeout(() => {
         pendingArgs.current = null;
         timeout.current = null;
-        fnRef.current(...args);
+        fnRef.current(...args, undefined);
       }, delay);
     },
     [delay]
@@ -196,10 +198,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   }, [editor, readingMode]);
 
   const saveContent = useCallback(
-    async (content: unknown) => {
+    async (content: unknown, opts?: SaveOpts) => {
       setSaveState("saving");
       try {
-        await patchJSON(key, { content });
+        await patchJSON(key, { content }, opts);
         setSaveState("saved");
       } catch {
         // Não deixa o indicador preso em "Salvando..." pra sempre — melhor
@@ -213,10 +215,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [debouncedSaveContent, flushSaveContent] = useDebouncedCallback(saveContent, 700);
 
   const saveTitle = useCallback(
-    async (value: string) => {
+    async (value: string, opts?: SaveOpts) => {
       setSaveState("saving");
       try {
-        await patchJSON(key, { title: value });
+        await patchJSON(key, { title: value }, opts);
         await mutate("/api/notes");
         setSaveState("saved");
       } catch {
@@ -232,24 +234,37 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   // ou o SO suspender a máquina não passa por aí — o timer do debounce é só
   // destruído, e a última mudança (ainda dentro da janela de 700ms) se
   // perde, mesmo com o rótulo "Salvo" visível de um checkpoint anterior.
-  // `visibilitychange` dispara antes da aba sumir de verdade (troca de aba,
-  // minimizar, fechar) e ainda dá tempo do fetch do PATCH completar, então é
-  // o sinal mais confiável pra descarregar o que está pendente.
+  //
+  // Duas situações diferentes, dois tratamentos:
+  // - visibilitychange (troca de aba, minimizar): a PÁGINA CONTINUA VIVA em
+  //   segundo plano, então um fetch comum tem todo o tempo do mundo pra
+  //   terminar — sem motivo pra usar keepalive (que tem limite de ~64KB).
+  // - pagehide/beforeunload (fechar a aba de verdade, navegar pra fora,
+  //   recarregar): a página está sendo destruída NESSE EXATO MOMENTO — um
+  //   fetch comum iniciado aqui não tem garantia nenhuma de terminar antes
+  //   do navegador matar o processo (é só "melhor esforço", e foi
+  //   exatamente esse buraco que deixava o final do texto se perder mesmo
+  //   com o flush "funcionando"). keepalive:true entrega o request pro
+  //   navegador processar de forma assíncrona, sobrevivendo à página.
   useEffect(() => {
-    function flushPending() {
+    function flushOnHide() {
       flushSaveTitle();
       flushSaveContent();
     }
+    function flushOnUnload() {
+      flushSaveTitle({ keepalive: true });
+      flushSaveContent({ keepalive: true });
+    }
     function onVisibilityChange() {
-      if (document.visibilityState === "hidden") flushPending();
+      if (document.visibilityState === "hidden") flushOnHide();
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", flushPending);
-    window.addEventListener("beforeunload", flushPending);
+    window.addEventListener("pagehide", flushOnUnload);
+    window.addEventListener("beforeunload", flushOnUnload);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", flushPending);
-      window.removeEventListener("beforeunload", flushPending);
+      window.removeEventListener("pagehide", flushOnUnload);
+      window.removeEventListener("beforeunload", flushOnUnload);
     };
   }, [flushSaveTitle, flushSaveContent]);
 
