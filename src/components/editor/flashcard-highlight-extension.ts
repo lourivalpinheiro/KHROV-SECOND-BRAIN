@@ -70,12 +70,42 @@ export const FlashcardHighlight = Extension.create({
   name: "flashcardHighlight",
 
   addProseMirrorPlugins() {
+    const key = new PluginKey<{ hasFocus: boolean }>("flashcardHighlight");
+
     return [
       new Plugin({
-        key: new PluginKey("flashcardHighlight"),
+        key,
+        state: {
+          init: () => ({ hasFocus: false }),
+          apply(tr, prev) {
+            const meta = tr.getMeta(key) as { hasFocus: boolean } | undefined;
+            return meta ? meta : prev;
+          },
+        },
+        view(editorView) {
+          // decorations(state) só enxerga o doc/seleção, não se o editor
+          // tem foco de verdade — sem isto, numa nota de UM parágrafo só,
+          // o cursor "cai" dentro do parágrafo por padrão mesmo sem
+          // ninguém ter clicado, e a resposta nunca escondia. Guarda o
+          // foco real no state do próprio plugin, via uma transação
+          // vazia (só meta) nos eventos de focus/blur do DOM do editor.
+          const onFocus = () =>
+            editorView.dispatch(editorView.state.tr.setMeta(key, { hasFocus: true }));
+          const onBlur = () =>
+            editorView.dispatch(editorView.state.tr.setMeta(key, { hasFocus: false }));
+          editorView.dom.addEventListener("focus", onFocus);
+          editorView.dom.addEventListener("blur", onBlur);
+          return {
+            destroy() {
+              editorView.dom.removeEventListener("focus", onFocus);
+              editorView.dom.removeEventListener("blur", onBlur);
+            },
+          };
+        },
         props: {
           decorations(state) {
             const decorations: Decoration[] = [];
+            const { hasFocus } = key.getState(state) ?? { hasFocus: false };
             const { from: selFrom, to: selTo } = state.selection;
             let lastWasMultiQuestion = false;
             let lastMultiRange: { from: number; to: number } | null = null;
@@ -98,8 +128,9 @@ export const FlashcardHighlight = Extension.create({
 
                 const nodeFrom = offset;
                 const nodeTo = offset + node.nodeSize;
-                // Cursor/seleção tocando esta linha = modo edição, mostra tudo cru.
-                const isFocused = selFrom < nodeTo && selTo > nodeFrom;
+                // Editor com foco DE VERDADE + cursor/seleção tocando esta linha = modo
+                // edição, mostra tudo cru.
+                const isFocused = hasFocus && selFrom < nodeTo && selTo > nodeFrom;
                 const paraStart = offset + 1; // primeira posição de texto dentro do parágrafo
 
                 decorations.push(
@@ -156,8 +187,8 @@ export const FlashcardHighlight = Extension.create({
                 const nodeFrom = offset;
                 const nodeTo = offset + node.nodeSize;
                 const questionFocused =
-                  lastMultiRange !== null && selFrom < lastMultiRange.to && selTo > lastMultiRange.from;
-                const listFocused = selFrom < nodeTo && selTo > nodeFrom;
+                  hasFocus && lastMultiRange !== null && selFrom < lastMultiRange.to && selTo > lastMultiRange.from;
+                const listFocused = hasFocus && selFrom < nodeTo && selTo > nodeFrom;
                 decorations.push(
                   Decoration.node(nodeFrom, nodeTo, {
                     class: `flashcard-answers${questionFocused || listFocused ? "" : " flashcard-hidden-node"}`,
