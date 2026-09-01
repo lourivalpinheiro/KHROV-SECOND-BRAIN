@@ -23,6 +23,12 @@ model User {
   healthProfile        HealthProfile?
   healthDays           HealthDay[]
   healthProfileHistory HealthProfileHistory[]
+
+  financeProfile         FinanceProfile?
+  financeEntries         FinanceEntry[]
+  financeTags            FinanceTag[]
+  financeBudgetVariables FinanceBudgetVariable[]
+  financeSavingsPockets  FinanceSavingsPocket[]
 }
 
 /**
@@ -216,4 +222,152 @@ model HealthProfileHistory {
   recordedAt       DateTime @default(now())
 
   @@index([userId, recordedAt])
+}
+
+/**
+ * Ponto de partida do saldo — "eu tenho R$X hoje" registrado numa data.
+ * Saldo atual/projeção = esse valor + a soma de todos os lançamentos a
+ * partir de `startingBalanceDate` (ver src/lib/finance.ts). Editável a
+ * qualquer momento (ex: recalibrar depois de conferir o extrato real).
+ */
+model FinanceProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startingBalance     Float    @default(0)
+  startingBalanceDate DateTime @default(now()) @db.Date
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/**
+ * Módulo Financeiro — entradas, saídas, economias, gasto do dia a dia
+ * ("diário", contra o teto calculado em FinanceBudgetVariable) e cartão de
+ * crédito. `amount` é sempre positivo; o sinal (soma/subtrai do saldo) é
+ * decidido pelo `type` na hora de calcular (ver src/lib/finance.ts).
+ */
+enum FinanceEntryType {
+  INCOME
+  EXPENSE
+  SAVINGS
+  DAILY
+  CREDIT_CARD
+}
+
+/** Recorrência simples — projeção futura expande isso sem materializar linha por ocorrência (ver src/lib/finance.ts). */
+enum RecurrenceType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+/** Só importa quando `type` é SAVINGS: DEPOSIT tira do saldo disponível (guardando no cofrinho), WITHDRAWAL devolve pro saldo disponível (resgate do cofrinho). */
+enum SavingsDirection {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+/**
+ * Um "cofrinho" — pote de economia nomeado (ex: "Viagem", "Reserva").
+ * Lançamentos do tipo SAVINGS podem apontar pra um, e a página dedicada
+ * do cofrinho (histórico + tabela) só olha os lançamentos dele. Os três
+ * campos de meta são opcionais — preenchidos, o cofrinho também aparece
+ * em /financeiro/metas com uma barra de progresso (saldo do cofrinho ÷
+ * targetAmount).
+ */
+model FinanceSavingsPocket {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+
+  targetAmount        Float?
+  targetDate          DateTime? @db.Date
+  monthlyContribution Float?
+
+  entries   FinanceEntry[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/**
+ * Um lançamento financeiro. `date` é a data que impacta o saldo — pra
+ * cartão de crédito, é o vencimento da fatura daquela parcela, não o dia
+ * da compra. Parcelamento vira várias linhas com o mesmo
+ * `installmentGroupId`, uma por vencimento (ver /api/finance/entries).
+ */
+model FinanceEntry {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          FinanceEntryType
+  description   String
+  amount        Float
+  date          DateTime         @db.Date
+  recurrence    RecurrenceType   @default(NONE)
+  /** Null = recorrência sem data final (a projeção futura tem um teto de qualquer forma). */
+  recurrenceEndDate DateTime?    @db.Date
+
+  installmentGroupId String?
+  installmentNumber  Int?
+  installmentTotal   Int?
+
+  /** Só usado quando type=SAVINGS — qual cofrinho recebe/perde o valor. */
+  pocketId         String?
+  pocket           FinanceSavingsPocket? @relation(fields: [pocketId], references: [id], onDelete: SetNull)
+  savingsDirection SavingsDirection      @default(DEPOSIT)
+
+  tags      FinanceEntryTag[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([installmentGroupId])
+  @@index([pocketId])
+}
+
+model FinanceTag {
+  id      String            @id @default(cuid())
+  name    String
+  userId  String
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries FinanceEntryTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model FinanceEntryTag {
+  entryId String
+  tagId   String
+  entry   FinanceEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tag     FinanceTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, tagId])
+  @@index([tagId])
+}
+
+/**
+ * Uma "variável" livre da previsão diária (nome + valor, o usuário define
+ * quantas quiser) — a soma de todas dividida por 30 é o teto de gasto do
+ * dia (ver dailyAllowance em src/lib/finance.ts). `order` só controla a
+ * ordem de exibição.
+ */
+model FinanceBudgetVariable {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  amount    Float
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, order])
 }
