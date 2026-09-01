@@ -21,6 +21,7 @@ type Pocket = {
   targetAmount: number | null;
   targetDate: string | null;
   monthlyContribution: number | null;
+  startingBalanceDate: string | null;
   cdiPercentage: number | null;
   maturityDate: string | null;
 };
@@ -100,6 +101,7 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
   );
   const [cdiPercentage, setCdiPercentage] = useState(pocket.cdiPercentage ? String(pocket.cdiPercentage) : "");
   const [maturityDate, setMaturityDate] = useState(pocket.maturityDate ?? "");
+  const [startingBalanceDate, setStartingBalanceDate] = useState(pocket.startingBalanceDate ?? "");
   const [saving, setSaving] = useState(false);
 
   const hasGoal = pocket.targetAmount && pocket.targetAmount > 0;
@@ -123,6 +125,7 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
         monthlyContribution: monthlyContribution === "" ? null : Number(monthlyContribution),
         cdiPercentage: pocket.kind === "INVESTMENT" ? (cdiPercentage === "" ? null : Number(cdiPercentage)) : undefined,
         maturityDate: pocket.kind === "INVESTMENT" ? maturityDate || null : undefined,
+        startingBalanceDate: pocket.kind === "INVESTMENT" ? startingBalanceDate || null : undefined,
       });
       await mutate("/api/finance/pockets");
       toast.success("Meta salva.");
@@ -200,6 +203,10 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
               <div className="space-y-1.5">
                 <Label className="text-xs">Vencimento</Label>
                 <Input type="date" value={maturityDate} onChange={(e) => setMaturityDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Desde quando (saldo inicial)</Label>
+                <Input type="date" value={startingBalanceDate} onChange={(e) => setStartingBalanceDate(e.target.value)} />
               </div>
             </>
           )}

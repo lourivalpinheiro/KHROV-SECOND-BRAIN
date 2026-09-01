@@ -44,6 +44,7 @@ export default function CofrinhosPage() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<PocketKind>("SAVINGS");
   const [startingBalance, setStartingBalance] = useState("");
+  const [startingBalanceDate, setStartingBalanceDate] = useState(() => toLocalDateKey(new Date()));
   const [cdiPercentage, setCdiPercentage] = useState("");
   const [maturityDate, setMaturityDate] = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,12 +60,13 @@ export default function CofrinhosPage() {
         name: name.trim(),
         kind,
         startingBalance: startingBalance || 0,
-        startingBalanceDate: toLocalDateKey(new Date()),
+        startingBalanceDate,
         cdiPercentage: kind === "INVESTMENT" && cdiPercentage ? cdiPercentage : null,
         maturityDate: kind === "INVESTMENT" && maturityDate ? maturityDate : null,
       });
       setName("");
       setStartingBalance("");
+      setStartingBalanceDate(toLocalDateKey(new Date()));
       setCdiPercentage("");
       setMaturityDate("");
       setKind("SAVINGS");
@@ -94,8 +96,8 @@ export default function CofrinhosPage() {
 
         {showForm && (
           <div className="mb-4 space-y-3 rounded-xl border bg-card p-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="col-span-2 space-y-1.5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="col-span-2 space-y-1.5 sm:col-span-1">
                 <Label className="text-xs">Nome</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Viagem, Tesouro Direto..." />
               </div>
@@ -123,6 +125,18 @@ export default function CofrinhosPage() {
                 />
               </div>
             </div>
+
+            {Number(startingBalance) > 0 && (
+              <div className="max-w-56 space-y-1.5">
+                <Label className="text-xs">Desde quando (data do saldo inicial)</Label>
+                <Input type="date" value={startingBalanceDate} onChange={(e) => setStartingBalanceDate(e.target.value)} />
+                {kind === "INVESTMENT" && (
+                  <p className="text-xs text-muted-foreground">
+                    Importante pra calcular o rendimento real — é a partir dessa data que o CDI passa a compor.
+                  </p>
+                )}
+              </div>
+            )}
 
             {kind === "INVESTMENT" && (
               <div className="grid grid-cols-2 gap-2">
