@@ -11,21 +11,32 @@ import {
   Dumbbell,
   Flame,
   CalendarCheck2,
+  Moon,
+  PartyPopper,
   Pill,
   LineChart,
+  Target,
   TrendingUp,
 } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toLocalDateKey, WEEKDAY_LABELS_LONG } from "@/lib/health";
+import { isWeightGoalReached, toLocalDateKey, weightGoalProgressPercent, WEEKDAY_LABELS_LONG } from "@/lib/health";
+import { cn } from "@/lib/utils";
 
 function shortDate(dateKey: string) {
   return `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
 }
 
 type Summary = {
-  profile: { weightKg: number; heightCm: number; waterGoalBottles: number; gymPlanDays: number[] } | null;
+  profile: {
+    weightKg: number;
+    heightCm: number;
+    waterGoalBottles: number;
+    gymPlanDays: number[];
+    targetWeightKg: number | null;
+    targetWeightBaselineKg: number | null;
+  } | null;
   weekStart?: string;
   weekEnd?: string;
   isCurrentWeek?: boolean;
@@ -100,6 +111,13 @@ export default function SaudeDashboardPage() {
   }
 
   const planLabel = summary.profile.gymPlanDays.map((d) => WEEKDAY_LABELS_LONG[d].slice(0, 3)).join(", ");
+  const hasWeightGoal = !!(summary.profile.targetWeightKg && summary.profile.targetWeightBaselineKg != null);
+  const weightGoalReached =
+    hasWeightGoal &&
+    isWeightGoalReached(summary.profile.weightKg, summary.profile.targetWeightKg!, summary.profile.targetWeightBaselineKg!);
+  const weightGoalPct = hasWeightGoal
+    ? weightGoalProgressPercent(summary.profile.weightKg, summary.profile.targetWeightKg!, summary.profile.targetWeightBaselineKg!)
+    : 0;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -108,6 +126,30 @@ export default function SaudeDashboardPage() {
           <Activity className="size-5 text-muted-foreground" />
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Saúde — resumo</h1>
         </div>
+
+        {hasWeightGoal && (
+          <div
+            className={cn(
+              "mb-6 rounded-xl border p-4",
+              weightGoalReached ? "border-primary/40 bg-primary/10" : "border-primary/20 bg-primary/5"
+            )}
+          >
+            {weightGoalReached ? (
+              <p className="flex items-center gap-2 text-sm font-medium text-primary">
+                <PartyPopper className="size-4" /> Parabéns! Você bateu a meta de {summary.profile.targetWeightKg}kg.
+              </p>
+            ) : (
+              <>
+                <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-primary">
+                  <Target className="size-4" /> Meta de peso: {weightGoalPct.toFixed(0)}% até {summary.profile.targetWeightKg}kg
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${weightGoalPct}%` }} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Metas em destaque */}
         <div className="mb-6 grid gap-3 sm:grid-cols-2">
@@ -219,6 +261,9 @@ export default function SaudeDashboardPage() {
           </Button>
           <Button variant="outline" render={<Link href="/saude/caderno" />}>
             Abrir caderno
+          </Button>
+          <Button variant="outline" render={<Link href="/saude/sono" />}>
+            <Moon /> Sono
           </Button>
           <Button variant="outline" render={<Link href="/saude/historico" />}>
             <LineChart /> Histórico

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
-import { Settings2 } from "lucide-react";
+import { PartyPopper, Settings2, Target } from "lucide-react";
 import { fetcher, patchJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { WEEKDAY_LABELS_LONG, suggestWaterGoalBottles } from "@/lib/health";
+import { WEEKDAY_LABELS_LONG, suggestWaterGoalBottles, isWeightGoalReached, weightGoalProgressPercent } from "@/lib/health";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type HealthProfile = {
@@ -15,6 +16,9 @@ type HealthProfile = {
   heightCm: number;
   waterGoalBottles: number;
   gymPlanDays: number[];
+  targetWeightKg: number | null;
+  targetWeightBaselineKg: number | null;
+  targetWeightReachedAt: string | null;
 } | null;
 
 /**
@@ -28,6 +32,7 @@ export default function PerfilSaudePage() {
   const [heightCm, setHeightCm] = useState("");
   const [waterGoalBottles, setWaterGoalBottles] = useState("4");
   const [gymPlanDays, setGymPlanDays] = useState<number[]>([1, 3, 5]);
+  const [targetWeightKg, setTargetWeightKg] = useState("");
   const [saving, setSaving] = useState(false);
   const loaded = useRef(false);
 
@@ -38,6 +43,7 @@ export default function PerfilSaudePage() {
     setHeightCm(String(profile.heightCm));
     setWaterGoalBottles(String(profile.waterGoalBottles));
     setGymPlanDays(profile.gymPlanDays);
+    setTargetWeightKg(profile.targetWeightKg ? String(profile.targetWeightKg) : "");
   }, [profile]);
 
   function toggleDay(day: number) {
@@ -60,17 +66,27 @@ export default function PerfilSaudePage() {
       toast.error("Meta de água inválida.");
       return;
     }
+    const targetWeightNum = targetWeightKg.trim() === "" ? null : Number(targetWeightKg);
+    if (targetWeightNum !== null && (!Number.isFinite(targetWeightNum) || targetWeightNum <= 0)) {
+      toast.error("Meta de peso inválida.");
+      return;
+    }
     setSaving(true);
     try {
-      await patchJSON("/api/health/profile", {
+      const updated = await patchJSON<{ justReachedWeightGoal?: boolean }>("/api/health/profile", {
         weightKg: weight,
         heightCm: height,
         waterGoalBottles: bottles,
         gymPlanDays,
+        targetWeightKg: targetWeightNum,
       });
       await mutate("/api/health/profile");
       await mutate("/api/health/summary");
-      toast.success("Perfil salvo.");
+      if (updated.justReachedWeightGoal) {
+        toast.success("Parabéns! Você bateu sua meta de peso! 🎉", { duration: 6000 });
+      } else {
+        toast.success("Perfil salvo.");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao salvar perfil.");
     } finally {
@@ -80,6 +96,13 @@ export default function PerfilSaudePage() {
 
   const weightNum = Number(weightKg);
   const suggestedBottles = weightNum > 0 ? suggestWaterGoalBottles(weightNum) : null;
+
+  const hasGoal = !!(profile?.targetWeightKg && profile.targetWeightBaselineKg != null);
+  const goalReached =
+    hasGoal && isWeightGoalReached(profile!.weightKg, profile!.targetWeightKg!, profile!.targetWeightBaselineKg!);
+  const goalPct = hasGoal
+    ? weightGoalProgressPercent(profile!.weightKg, profile!.targetWeightKg!, profile!.targetWeightBaselineKg!)
+    : 0;
 
   if (isLoading) {
     return <div className="flex-1 p-8 text-sm text-muted-foreground">Carregando...</div>;
@@ -117,6 +140,37 @@ export default function PerfilSaudePage() {
                 placeholder="Ex: 183"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="target-weight">Meta de peso (kg, opcional)</Label>
+            <Input
+              id="target-weight"
+              type="number"
+              inputMode="decimal"
+              value={targetWeightKg}
+              onChange={(e) => setTargetWeightKg(e.target.value)}
+              placeholder="Ex: 100"
+              className="w-28"
+            />
+            {hasGoal && (
+              <div className={cn("rounded-lg border p-3", goalReached ? "border-primary/40 bg-primary/10" : "bg-muted/30")}>
+                {goalReached ? (
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                    <PartyPopper className="size-4" /> Meta batida! Você chegou aos {profile!.targetWeightKg}kg.
+                  </p>
+                ) : (
+                  <>
+                    <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Target className="size-3.5" /> {goalPct.toFixed(0)}% do caminho até {profile!.targetWeightKg}kg
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${goalPct}%` }} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

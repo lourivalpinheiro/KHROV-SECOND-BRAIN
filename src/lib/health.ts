@@ -217,3 +217,49 @@ function computeStreak(
 
   return streak;
 }
+
+/**
+ * Meta de peso: `baseline` é o peso registrado no momento em que a meta
+ * foi definida (ou mudou) — define a direção (emagrecer ou ganhar peso).
+ * Se a meta é igual ao baseline, não há o que bater.
+ */
+export function isWeightGoalReached(currentWeightKg: number, targetWeightKg: number, baselineWeightKg: number): boolean {
+  if (targetWeightKg === baselineWeightKg) return true;
+  return targetWeightKg < baselineWeightKg ? currentWeightKg <= targetWeightKg : currentWeightKg >= targetWeightKg;
+}
+
+/** 0..100 — quanto do caminho entre o peso de partida e a meta já foi andado (trava nas pontas, então nunca passa de 100 nem fica negativo mesmo se ultrapassar a meta). */
+export function weightGoalProgressPercent(currentWeightKg: number, targetWeightKg: number, baselineWeightKg: number): number {
+  if (targetWeightKg === baselineWeightKg) return 100;
+  const pct = ((currentWeightKg - baselineWeightKg) / (targetWeightKg - baselineWeightKg)) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+/** "23:00" → 1380 (minutos desde meia-noite). */
+export function parseTimeToMinutes(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/** 1380 → "23:00". */
+export function minutesToTimeLabel(minutes: number): string {
+  const m = ((minutes % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/**
+ * Pra desenhar num eixo contínuo: horários de madrugada (00:00–11:59)
+ * "continuam" depois da noite anterior em vez de voltar pro início da
+ * escala — 23:00 vira 1380, 00:30 vira 1470 (24h + 30min), assim dormir
+ * um pouco depois da meia-noite aparece IMEDIATAMENTE depois de 23h no
+ * gráfico, não lá no início do eixo.
+ */
+export function sleepChartValue(bedtimeMinutes: number): number {
+  return bedtimeMinutes < 720 ? bedtimeMinutes + 1440 : bedtimeMinutes;
+}
