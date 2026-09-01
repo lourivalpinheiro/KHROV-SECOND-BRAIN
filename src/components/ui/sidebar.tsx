@@ -313,7 +313,15 @@ function SidebarTrigger({
   onMouseLeave,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar, openPreview, closePreview } = useSidebar()
+  const { toggleSidebar, openPreview, closePreview, previewOpen, state, isMobile } = useSidebar()
+  // A sidebar colapsada em preview é mais larga que o header à esquerda e
+  // passa POR CIMA deste botão (fisicamente na mesma região da tela) — o
+  // próprio preview já mostra a logo "Khrov" ali. Em vez de deixar os dois
+  // desenhando um em cima do outro (o ícone bugado que aparecia), o botão
+  // fica transparente enquanto isso (opacity, não display/pointer-events —
+  // continua ocupando o mesmo espaço, então hover e clique seguem
+  // funcionando normalmente, só não é mais desenhado por cima).
+  const isPreviewing = !isMobile && previewOpen && state === "collapsed"
 
   return (
     <Button
@@ -324,7 +332,7 @@ function SidebarTrigger({
       // z-index acima do sidebar-container (z-10) — sem isso, quando a
       // sidebar colapsada "acorda" em preview (mais larga que o header à
       // esquerda), ela sobrepõe visualmente este botão e rouba o clique.
-      className={cn("relative z-20", className)}
+      className={cn("relative z-20 transition-opacity duration-200", isPreviewing && "opacity-0", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
