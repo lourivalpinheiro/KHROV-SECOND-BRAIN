@@ -295,6 +295,18 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
           </div>
         )}
 
+        {pocket.kind === "INVESTMENT" && !cdiEligible && (
+          <div className="mb-6 rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
+            <p className="mb-2">
+              Falta {!pocket.cdiPercentage && !pocket.maturityDate ? "o %CDI e o vencimento" : !pocket.cdiPercentage ? "o %CDI" : "o vencimento"} pra
+              calcular e mostrar o histórico de rendimento.
+            </p>
+            <Button size="sm" variant="outline" render={<Link href={`/financeiro/metas?pocket=${pocketId}`} />}>
+              Definir agora
+            </Button>
+          </div>
+        )}
+
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
           <div className="space-y-1">
             <Label className="text-xs">De</Label>
