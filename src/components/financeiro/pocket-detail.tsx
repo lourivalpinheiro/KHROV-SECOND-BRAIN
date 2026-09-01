@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
 import { Bar, BarChart, CartesianGrid, Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts";
-import { ArrowLeft, ChevronLeft, ChevronRight, LineChart, PiggyBank, Settings2, Trash2 } from "lucide-react";
-import { fetcher, deleteJSON } from "@/lib/api-client";
+import { ArrowLeft, ChevronLeft, ChevronRight, LineChart, PiggyBank, Pencil, Settings2, Trash2, X } from "lucide-react";
+import { fetcher, deleteJSON, patchJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,8 @@ type Pocket = {
   name: string;
   kind: "SAVINGS" | "INVESTMENT";
   balance: number;
+  startingBalance: number;
+  startingBalanceDate: string | null;
   targetAmount: number | null;
   targetDate: string | null;
   monthlyContribution: number | null;
@@ -68,6 +70,10 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
   const [fromDate, setFromDate] = useState(toLocalDateKey(oneYearAgo));
   const [toDate, setToDate] = useState(toLocalDateKey(new Date()));
   const [page, setPage] = useState(0);
+  const [editingBalance, setEditingBalance] = useState(false);
+  const [balanceInput, setBalanceInput] = useState("");
+  const [balanceDateInput, setBalanceDateInput] = useState("");
+  const [savingBalance, setSavingBalance] = useState(false);
 
   const { data: pocket, isLoading: loadingPocket } = useSWR<Pocket>(`/api/finance/pockets/${pocketId}`, fetcher);
   const entriesQuery = `/api/finance/entries?pocketId=${pocketId}&from=${fromDate}&to=${toDate}`;
@@ -105,6 +111,36 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
     return sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   }, [entries, page]);
   const totalPages = Math.max(1, Math.ceil((entries?.length ?? 0) / PAGE_SIZE));
+
+  function startEditBalance() {
+    setBalanceInput(pocket ? String(pocket.startingBalance) : "0");
+    setBalanceDateInput(pocket?.startingBalanceDate ?? toLocalDateKey(new Date()));
+    setEditingBalance(true);
+  }
+
+  async function saveBalance() {
+    const n = Number(balanceInput);
+    if (!Number.isFinite(n)) {
+      toast.error("Valor inválido.");
+      return;
+    }
+    setSavingBalance(true);
+    try {
+      await patchJSON(`/api/finance/pockets/${pocketId}`, {
+        startingBalance: n,
+        startingBalanceDate: balanceDateInput || toLocalDateKey(new Date()),
+      });
+      await mutate(`/api/finance/pockets/${pocketId}`);
+      await mutate("/api/finance/pockets");
+      await mutate("/api/finance/summary");
+      setEditingBalance(false);
+      toast.success("Saldo ajustado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao ajustar saldo.");
+    } finally {
+      setSavingBalance(false);
+    }
+  }
 
   async function deletePocket() {
     const ok = await confirm({
@@ -169,8 +205,38 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
         </div>
 
         <div className="mb-6 rounded-xl border bg-card p-4">
-          <div className="text-xs font-medium text-muted-foreground">Saldo do cofrinho</div>
-          <div className="text-2xl font-semibold tracking-tight">{money(pocket.balance)}</div>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Saldo do cofrinho</div>
+              <div className="text-2xl font-semibold tracking-tight">{money(pocket.balance)}</div>
+            </div>
+            <Button variant="ghost" size="icon" className="size-8" onClick={() => (editingBalance ? setEditingBalance(false) : startEditBalance())} title="Ajustar saldo">
+              {editingBalance ? <X className="size-4" /> : <Pencil className="size-4" />}
+            </Button>
+          </div>
+
+          {editingBalance && (
+            <div className="mt-3 space-y-2 border-t pt-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor (R$)</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={balanceInput} onChange={(e) => setBalanceInput(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Desde quando</Label>
+                  <Input type="date" value={balanceDateInput} onChange={(e) => setBalanceDateInput(e.target.value)} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pra corrigir o saldo de hoje pra um valor certo (ex: conferindo com o extrato), use a data de hoje —
+                assim não sobra nenhum depósito/resgate registrado no meio pra somar em cima.
+              </p>
+              <Button size="sm" onClick={saveBalance} disabled={savingBalance}>
+                Salvar saldo
+              </Button>
+            </div>
+          )}
+
           {hasGoal && (
             <div className="mt-2">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
