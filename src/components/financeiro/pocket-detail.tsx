@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
-import { Bar, BarChart, CartesianGrid, Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts";
-import { ArrowLeft, ChevronLeft, ChevronRight, LineChart, PiggyBank, Pencil, Settings2, Trash2, X } from "lucide-react";
+import { CartesianGrid, Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts";
+import { ArrowLeft, LineChart, PiggyBank, Pencil, Settings2, Trash2, X } from "lucide-react";
 import { fetcher, deleteJSON, patchJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,27 +30,12 @@ type Pocket = {
   maturityDate: string | null;
 };
 
-type EntryRow = {
-  id: string;
-  occurrenceDate: string;
-  description: string;
-  amount: number;
-  savingsDirection: "DEPOSIT" | "WITHDRAWAL";
-};
-
 type CdiResponse = {
   enabled: boolean;
   cdiPercentage?: number;
   maturityDate?: string;
   points: { date: string; principal: number; adjusted: number }[];
 };
-
-const PAGE_SIZE = 10;
-
-const chartConfig = {
-  deposits: { label: "Depósitos", color: "var(--primary)" },
-  withdrawals: { label: "Resgates", color: "var(--destructive)" },
-} satisfies ChartConfig;
 
 const cdiChartConfig = {
   principal: { label: "Aportado", color: "var(--muted-foreground)" },
@@ -64,27 +49,41 @@ function money(v: number) {
 export function PocketDetail({ pocketId }: { pocketId: string }) {
   const router = useRouter();
   const { confirm, ConfirmDialog } = useConfirm();
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-  const [fromDate, setFromDate] = useState(toLocalDateKey(oneYearAgo));
-  const [toDate, setToDate] = useState(toLocalDateKey(new Date()));
-  const [page, setPage] = useState(0);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const rangeLoaded = useRef(false);
   const [editingBalance, setEditingBalance] = useState(false);
   const [balanceInput, setBalanceInput] = useState("");
   const [balanceDateInput, setBalanceDateInput] = useState("");
   const [savingBalance, setSavingBalance] = useState(false);
 
   const { data: pocket, isLoading: loadingPocket } = useSWR<Pocket>(`/api/finance/pockets/${pocketId}`, fetcher);
-  const entriesQuery = `/api/finance/entries?pocketId=${pocketId}&from=${fromDate}&to=${toDate}`;
-  const { data: entries, isLoading: loadingEntries } = useSWR<EntryRow[]>(entriesQuery, fetcher);
 
   const cdiEligible = !!pocket?.cdiPercentage;
   const { data: cdiData, isLoading: loadingCdi } = useSWR<CdiResponse>(
     cdiEligible ? `/api/finance/pockets/${pocketId}/cdi` : null,
     fetcher
   );
-  const cdiChartData = useMemo(() => cdiData?.points.map((p) => ({ date: p.date, principal: p.principal, adjusted: p.adjusted })) ?? [], [cdiData]);
+
+  // Assim que o cofrinho carrega, o filtro de data começa mostrando o
+  // histórico inteiro (desde o saldo inicial até hoje) — o cálculo em si
+  // sempre parte da data do saldo inicial, o filtro só recorta o que
+  // aparece no gráfico.
+  useEffect(() => {
+    if (!pocket || rangeLoaded.current) return;
+    rangeLoaded.current = true;
+    setFromDate(pocket.startingBalanceDate ?? toLocalDateKey(new Date()));
+    setToDate(toLocalDateKey(new Date()));
+  }, [pocket]);
+
+  const cdiChartData = useMemo(() => {
+    const points = cdiData?.points ?? [];
+    return points
+      .filter((p) => (!fromDate || p.date >= fromDate) && (!toDate || p.date <= toDate))
+      .map((p) => ({ date: p.date, principal: p.principal, adjusted: p.adjusted }));
+  }, [cdiData, fromDate, toDate]);
+
   const cdiYield = useMemo(() => {
     if (!cdiData || cdiData.points.length === 0) return null;
     const last = cdiData.points[cdiData.points.length - 1];
@@ -92,25 +91,6 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
     const yieldPct = last.principal > 0 ? (yieldValue / last.principal) * 100 : 0;
     return { value: yieldValue, pct: yieldPct };
   }, [cdiData]);
-
-  const chartData = useMemo(() => {
-    if (!entries) return [];
-    const byMonth = new Map<string, { month: string; deposits: number; withdrawals: number }>();
-    for (const e of entries) {
-      const key = e.occurrenceDate.slice(0, 7);
-      const bucket = byMonth.get(key) ?? { month: key, deposits: 0, withdrawals: 0 };
-      if (e.savingsDirection === "WITHDRAWAL") bucket.withdrawals += e.amount;
-      else bucket.deposits += e.amount;
-      byMonth.set(key, bucket);
-    }
-    return Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
-  }, [entries]);
-
-  const paginated = useMemo(() => {
-    const sorted = entries ?? [];
-    return sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  }, [entries, page]);
-  const totalPages = Math.max(1, Math.ceil((entries?.length ?? 0) / PAGE_SIZE));
 
   function startEditBalance() {
     setBalanceInput(pocket ? String(pocket.startingBalance) : "0");
@@ -177,7 +157,7 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <Link href="/financeiro/cofrinhos" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-3.5" /> Cofrinhos
         </Link>
@@ -251,150 +231,74 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
         </div>
 
         {cdiEligible && (
-          <div className="mb-6 rounded-xl border bg-card p-4">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <div className="text-xs font-medium text-muted-foreground">
-                Rendimento — {pocket.cdiPercentage}% do CDI
-                {pocket.maturityDate
-                  ? ` até ${pocket.maturityDate.slice(8, 10)}/${pocket.maturityDate.slice(5, 7)}/${pocket.maturityDate.slice(0, 4)}`
-                  : " (sem vencimento)"}
+          <>
+            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+              <div className="space-y-1">
+                <Label className="text-xs">De</Label>
+                <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-36" />
               </div>
-              {cdiYield && (
-                <span className="text-sm font-semibold text-primary">
-                  +{money(cdiYield.value)} ({cdiYield.pct.toFixed(2)}%)
-                </span>
-              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Até</Label>
+                <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-36" />
+              </div>
             </div>
-            {loadingCdi ? (
-              <Skeleton className="h-48 w-full" />
-            ) : !cdiData || cdiData.points.length === 0 ? (
-              <p className="py-4 text-center text-xs text-muted-foreground">
-                Ainda sem dados suficientes pra calcular — volte depois do primeiro depósito.
+
+            <div className="mb-6 rounded-xl border bg-card p-4">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Rendimento — {pocket.cdiPercentage}% do CDI
+                  {pocket.maturityDate
+                    ? ` até ${pocket.maturityDate.slice(8, 10)}/${pocket.maturityDate.slice(5, 7)}/${pocket.maturityDate.slice(0, 4)}`
+                    : " (sem vencimento)"}
+                </div>
+                {cdiYield && (
+                  <span className="text-sm font-semibold text-primary">
+                    +{money(cdiYield.value)} ({cdiYield.pct.toFixed(2)}%)
+                  </span>
+                )}
+              </div>
+              {loadingCdi ? (
+                <Skeleton className="h-48 w-full" />
+              ) : cdiChartData.length === 0 ? (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  Nada nesse período — ajuste o filtro de data acima.
+                </p>
+              ) : (
+                <ChartContainer config={cdiChartConfig} className="aspect-auto h-56 w-full">
+                  <RechartsLineChart data={cdiChartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      minTickGap={32}
+                      tickFormatter={(v: string) => `${v.slice(8, 10)}/${v.slice(5, 7)}`}
+                    />
+                    <YAxis tickLine={false} axisLine={false} width={40} domain={["dataMin - 10", "dataMax + 10"]} />
+                    <ChartTooltip content={<ChartTooltipContent labelFormatter={(v) => `${String(v).slice(8, 10)}/${String(v).slice(5, 7)}/${String(v).slice(0, 4)}`} />} />
+                    <Line dataKey="principal" type="monotone" stroke="var(--color-principal)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                    <Line dataKey="adjusted" type="monotone" stroke="var(--color-adjusted)" strokeWidth={2} dot={false} />
+                  </RechartsLineChart>
+                </ChartContainer>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Taxa diária real do CDI (Banco Central) composta dia a dia desde o saldo inicial — não é garantia, é o
+                que teria rendido com a série publicada até agora. O ganho acima é o total desde o início; o filtro de
+                data só recorta o que aparece no gráfico.
               </p>
-            ) : (
-              <ChartContainer config={cdiChartConfig} className="aspect-auto h-56 w-full">
-                <RechartsLineChart data={cdiChartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    minTickGap={32}
-                    tickFormatter={(v: string) => `${v.slice(8, 10)}/${v.slice(5, 7)}`}
-                  />
-                  <YAxis tickLine={false} axisLine={false} width={40} domain={["dataMin - 10", "dataMax + 10"]} />
-                  <ChartTooltip content={<ChartTooltipContent labelFormatter={(v) => `${String(v).slice(8, 10)}/${String(v).slice(5, 7)}/${String(v).slice(0, 4)}`} />} />
-                  <Line dataKey="principal" type="monotone" stroke="var(--color-principal)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
-                  <Line dataKey="adjusted" type="monotone" stroke="var(--color-adjusted)" strokeWidth={2} dot={false} />
-                </RechartsLineChart>
-              </ChartContainer>
-            )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Taxa diária real do CDI (Banco Central) composta dia a dia — não é garantia, é o que teria rendido com a
-              série publicada até agora.
-            </p>
-          </div>
+            </div>
+          </>
         )}
 
         {pocket.kind === "INVESTMENT" && !cdiEligible && (
-          <div className="mb-6 rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
             <p className="mb-2">Falta o %CDI pra calcular e mostrar o histórico de rendimento — vencimento é opcional.</p>
             <Button size="sm" variant="outline" render={<Link href={`/financeiro/metas?pocket=${pocketId}`} />}>
               Definir agora
             </Button>
           </div>
         )}
-
-        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
-          <div className="space-y-1">
-            <Label className="text-xs">De</Label>
-            <Input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(0); }} className="h-8 w-36" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Até</Label>
-            <Input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(0); }} className="h-8 w-36" />
-          </div>
-        </div>
-
-        <div className="mb-6 rounded-xl border bg-card p-4">
-          <div className="mb-3 text-xs font-medium text-muted-foreground">Histórico de entradas e saídas</div>
-          {loadingEntries ? (
-            <Skeleton className="h-48 w-full" />
-          ) : chartData.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nada nesse período.</p>
-          ) : (
-            <ChartContainer config={chartConfig} className="aspect-auto h-56 w-full">
-              <BarChart data={chartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tickFormatter={(v: string) => {
-                    const [y, m] = v.split("-");
-                    return `${m}/${y.slice(2)}`;
-                  }}
-                />
-                <YAxis tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => `${v}`} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="deposits" fill="var(--color-deposits)" radius={2} />
-                <Bar dataKey="withdrawals" fill="var(--color-withdrawals)" radius={2} />
-              </BarChart>
-            </ChartContainer>
-          )}
-        </div>
-
-        <div className="rounded-xl border bg-card">
-          <div className="border-b px-4 py-2.5 text-xs font-medium text-muted-foreground">Lançamentos</div>
-          {loadingEntries ? (
-            <div className="p-4">
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : paginated.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">Nada nesse período.</p>
-          ) : (
-            <div className="divide-y">
-              {paginated.map((e) => (
-                <div key={e.id + e.occurrenceDate} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{e.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {e.occurrenceDate.slice(8, 10)}/{e.occurrenceDate.slice(5, 7)}/{e.occurrenceDate.slice(0, 4)} ·{" "}
-                      {e.savingsDirection === "DEPOSIT" ? "Depósito" : "Resgate"}
-                    </div>
-                  </div>
-                  <span className={e.savingsDirection === "DEPOSIT" ? "font-semibold text-primary" : "font-semibold text-destructive"}>
-                    {e.savingsDirection === "DEPOSIT" ? "+" : "-"}
-                    {money(e.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground">
-              <span>
-                Página {page + 1} de {totalPages}
-              </span>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="size-7" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
       {ConfirmDialog}
     </div>
