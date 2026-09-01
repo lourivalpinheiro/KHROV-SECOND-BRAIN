@@ -94,10 +94,41 @@ model Note {
   linksIn  NoteLink[] @relation("TargetNote")
 
   flashcardReviews FlashcardReview[]
+  stageHistory     NoteStageHistory[]
 
   @@unique([userId, dailyDate])
   @@index([userId])
   @@index([userId, deletedAt])
+}
+
+/**
+ * Snapshot do content da nota tirado toda vez que ela é promovida pra um
+ * estágio seguinte do pipeline (ver checkPromotion em src/lib/note-types.ts)
+ * — `stage` é o estágio que estava sendo deixado pra trás, `content` é a
+ * "foto" de como a nota era nesse exato momento. Só cresce, nunca é editado
+ * (mesmo padrão de HealthProfileHistory). Regressão de estágio NUNCA gera
+ * entrada aqui — não é história de verdade, é só desfazer. É assim que a
+ * mesma nota (mesmo id, content sempre editável) acumula uma linha do
+ * tempo: Estímulo → Potenciação → Sinapse, até virar Engrama.
+ */
+model NoteStageHistory {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  stage     NoteType
+  content   Json
+  /**
+   * true = não veio do hook de promoção de verdade — foi reconstruída
+   * depois, pra notas que já estavam além de Estímulo quando essa feature
+   * foi ligada (não existe conteúdo real de como elas eram em cada
+   * estágio anterior, então usa o content ATUAL como aproximação). A UI
+   * precisa deixar isso visível — não é história de verdade, é o melhor
+   * palpite disponível.
+   */
+  isEstimate Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([noteId, createdAt])
 }
 
 model Tag {

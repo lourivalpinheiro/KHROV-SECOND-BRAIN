@@ -57,6 +57,11 @@ export function isNoteType(value: unknown): value is NoteTypeValue {
 // "CORTEX", que corretamente não é encontrado — retorna -1, fora do pipeline).
 const PIPELINE_TYPES: readonly string[] = NOTE_TYPES;
 
+/** Índice do estágio na pipeline (0=Estímulo..3=Engrama), ou -1 se fora dela (Córtex). Usado pra distinguir promoção pra frente de regressão — ex: linha do tempo em NoteStageHistory. */
+export function pipelineIndex(type: NoteTypeValue): number {
+  return PIPELINE_TYPES.indexOf(type);
+}
+
 /** Próximo estágio na hierarquia, ou null se a nota já está no estágio final (ou fora do pipeline, ex: Córtex). */
 export function nextNoteType(type: NoteTypeValue): NoteTypeValue | null {
   const idx = PIPELINE_TYPES.indexOf(type);

@@ -49,6 +49,7 @@ import { NOTE_TYPE_META, MIN_SYNTHESIS_LENGTH, checkPromotion, type NoteTypeValu
 import { extractPlainText, extractLinkedNoteIds } from "@/lib/doc-utils";
 import { AttachmentsPanel } from "./attachments-panel";
 import { BacklinksPanel } from "./backlinks-panel";
+import { NoteTimelinePanel } from "./note-timeline-panel";
 import { NoteToc } from "./note-toc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -563,6 +564,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       )}
     >
       <NoteToc editor={editor} />
+      <NoteTimelinePanel entries={note.stageHistory} extensions={extensions} noteTitle={title} />
       <div
         className={cn(
           "mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8",

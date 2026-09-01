@@ -27,8 +27,20 @@ export type AttachmentDTO = {
   createdAt: string;
 };
 
+/** Uma "foto" do content da nota tirada quando ela deixou pra trás um estágio do pipeline — ver NoteStageHistory. */
+export type NoteStageHistoryDTO = {
+  id: string;
+  stage: "STIMULUS" | "POTENTIATION" | "SYNAPSE" | "ENGRAM";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  content: any;
+  createdAt: string;
+  /** true = reconstruída num backfill (nota já estava além de Estímulo antes da feature existir) — não é histórico real, é aproximação com o content atual. */
+  isEstimate: boolean;
+};
+
 export type NoteDetail = NoteListItem & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   attachments: AttachmentDTO[];
+  stageHistory: NoteStageHistoryDTO[];
 };
