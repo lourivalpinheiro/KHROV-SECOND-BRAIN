@@ -79,7 +79,7 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
   const entriesQuery = `/api/finance/entries?pocketId=${pocketId}&from=${fromDate}&to=${toDate}`;
   const { data: entries, isLoading: loadingEntries } = useSWR<EntryRow[]>(entriesQuery, fetcher);
 
-  const cdiEligible = !!(pocket?.cdiPercentage && pocket?.maturityDate);
+  const cdiEligible = !!pocket?.cdiPercentage;
   const { data: cdiData, isLoading: loadingCdi } = useSWR<CdiResponse>(
     cdiEligible ? `/api/finance/pockets/${pocketId}/cdi` : null,
     fetcher
@@ -254,8 +254,10 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
           <div className="mb-6 rounded-xl border bg-card p-4">
             <div className="mb-1 flex items-center justify-between gap-2">
               <div className="text-xs font-medium text-muted-foreground">
-                Rendimento — {pocket.cdiPercentage}% do CDI até{" "}
-                {pocket.maturityDate!.slice(8, 10)}/{pocket.maturityDate!.slice(5, 7)}/{pocket.maturityDate!.slice(0, 4)}
+                Rendimento — {pocket.cdiPercentage}% do CDI
+                {pocket.maturityDate
+                  ? ` até ${pocket.maturityDate.slice(8, 10)}/${pocket.maturityDate.slice(5, 7)}/${pocket.maturityDate.slice(0, 4)}`
+                  : " (sem vencimento)"}
               </div>
               {cdiYield && (
                 <span className="text-sm font-semibold text-primary">
@@ -297,10 +299,7 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
 
         {pocket.kind === "INVESTMENT" && !cdiEligible && (
           <div className="mb-6 rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
-            <p className="mb-2">
-              Falta {!pocket.cdiPercentage && !pocket.maturityDate ? "o %CDI e o vencimento" : !pocket.cdiPercentage ? "o %CDI" : "o vencimento"} pra
-              calcular e mostrar o histórico de rendimento.
-            </p>
+            <p className="mb-2">Falta o %CDI pra calcular e mostrar o histórico de rendimento — vencimento é opcional.</p>
             <Button size="sm" variant="outline" render={<Link href={`/financeiro/metas?pocket=${pocketId}`} />}>
               Definir agora
             </Button>

@@ -6,9 +6,10 @@ import { computeCdiEvolution, toLocalDateKey, type FinanceEntryLite } from "@/li
 
 /**
  * Evolução de um cofrinho indexado ao CDI (principal aportado × valor com
- * rendimento, dia a dia) — só existe quando o cofrinho tem %CDI E
- * vencimento definidos (ver /financeiro/cofrinhos). Vai só até o
- * vencimento ou hoje, o que vier primeiro.
+ * rendimento, dia a dia) — só precisa do %CDI (ver /financeiro/cofrinhos).
+ * Vencimento é opcional: tem CDB de liquidez diária, Tesouro Selic etc.
+ * sem data fixa — sem vencimento, a evolução vai só até hoje; com
+ * vencimento, para nele (ou em hoje, o que vier primeiro).
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,14 +25,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     });
     if (!pocket || pocket.userId !== userId) return jsonError("Cofrinho não encontrado.", 404);
 
-    if (!pocket.cdiPercentage || !pocket.maturityDate) {
+    if (!pocket.cdiPercentage) {
       return NextResponse.json({ enabled: false, points: [] });
     }
 
     const startKey = pocket.startingBalanceDate ? toLocalDateKey(pocket.startingBalanceDate) : toLocalDateKey(pocket.createdAt);
     const todayKey = toLocalDateKey(new Date());
-    const maturityKey = toLocalDateKey(pocket.maturityDate);
-    const endKey = maturityKey < todayKey ? maturityKey : todayKey;
+    const maturityKey = pocket.maturityDate ? toLocalDateKey(pocket.maturityDate) : null;
+    const endKey = maturityKey && maturityKey < todayKey ? maturityKey : todayKey;
 
     if (endKey < startKey) {
       return NextResponse.json({ enabled: true, cdiPercentage: pocket.cdiPercentage, maturityDate: maturityKey, points: [] });

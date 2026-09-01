@@ -156,8 +156,9 @@ export default function CofrinhosPage() {
                   <Input type="date" value={maturityDate} onChange={(e) => setMaturityDate(e.target.value)} />
                 </div>
                 <p className="col-span-2 text-xs text-muted-foreground">
-                  Preenchendo os dois, a página do cofrinho calcula o rendimento real dia a dia com o CDI de verdade
-                  (Banco Central) e mostra um gráfico de evolução.
+                  Preenchendo o %CDI, a página do cofrinho calcula o rendimento real dia a dia com o CDI de verdade
+                  (Banco Central) e mostra um gráfico de evolução — vencimento é opcional (deixe em branco se for
+                  liquidez diária, por exemplo).
                 </p>
               </div>
             )}
