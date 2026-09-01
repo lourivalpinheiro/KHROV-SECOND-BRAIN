@@ -1,8 +1,9 @@
 /**
- * Os 66 livros da Bíblia (Almeida/tradução comum em português) com o
- * número de capítulos de cada um — dado fixo, não fica no banco. Só o que
- * já foi lido é persistido (ver BibleReadingProgress), aqui é só a "grade"
- * completa pra desenhar a lista e calcular o progresso total.
+ * Os 66 livros do cânon protestante, com os títulos oficiais da Almeida
+ * Revista e Atualizada (ARA) e o número de capítulos de cada um — dado
+ * fixo, não fica no banco. Só o que já foi lido é persistido (ver
+ * BibleReadingProgress), aqui é só a "grade" completa pra desenhar a
+ * lista e calcular o progresso total.
  */
 export type BibleBook = { name: string; chapters: number; testament: "AT" | "NT" };
 
@@ -28,10 +29,10 @@ export const BIBLE_BOOKS: BibleBook[] = [
   { name: "Salmos", chapters: 150, testament: "AT" },
   { name: "Provérbios", chapters: 31, testament: "AT" },
   { name: "Eclesiastes", chapters: 12, testament: "AT" },
-  { name: "Cantares", chapters: 8, testament: "AT" },
+  { name: "Cantares de Salomão", chapters: 8, testament: "AT" },
   { name: "Isaías", chapters: 66, testament: "AT" },
   { name: "Jeremias", chapters: 52, testament: "AT" },
-  { name: "Lamentações", chapters: 5, testament: "AT" },
+  { name: "Lamentações de Jeremias", chapters: 5, testament: "AT" },
   { name: "Ezequiel", chapters: 48, testament: "AT" },
   { name: "Daniel", chapters: 12, testament: "AT" },
   { name: "Oséias", chapters: 14, testament: "AT" },
