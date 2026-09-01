@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, FileText, Plus, Trash2 } from "lucide-react";
 import { fetcher, deleteJSON } from "@/lib/api-client";
 import type { NoteListItem, TagDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,13 @@ import { toast } from "sonner";
 import { NOTE_TYPES, NOTE_TYPE_META } from "@/lib/note-types";
 import { isEmptyStimulus } from "@/lib/note-health";
 import { useNewNote } from "@/hooks/use-new-note";
+import { NOTE_TEMPLATES } from "@/lib/note-templates";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -79,9 +86,34 @@ export default function NotesPage() {
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{heading}</h1>
-          <Button onClick={requestCreate}>
-            <Plus /> Nova nota
-          </Button>
+          {/* Botão principal continua criando em branco num clique só (zero
+              fricção pro caso comum) — os templates ficam no menu junto,
+              pra quem quiser começar já com uma estrutura (nota de livro,
+              de pessoa) sem digitar os títulos de seção toda vez. */}
+          <div className="flex">
+            <Button className="rounded-r-none" onClick={() => requestCreate()}>
+              <Plus /> Nova nota
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button className="rounded-l-none border-l border-primary-foreground/20 px-2">
+                    <ChevronDown />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                {NOTE_TEMPLATES.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <DropdownMenuItem key={t.key} onClick={() => requestCreate(t.key)}>
+                      <Icon /> {t.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <NotesFilterBar />
@@ -98,7 +130,7 @@ export default function NotesPage() {
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center text-muted-foreground">
             <FileText className="size-8" />
             <p>Nenhuma nota encontrada.</p>
-            <Button variant="outline" onClick={requestCreate}>
+            <Button variant="outline" onClick={() => requestCreate()}>
               <Plus /> Criar nota
             </Button>
           </div>

@@ -17,6 +17,7 @@ import {
   HeartHandshake,
   History,
   Layers,
+  LayoutDashboard,
   LineChart,
   Moon,
   Network,
@@ -146,7 +147,7 @@ export function AppSidebar({
             <SidebarMenu className="gap-1 px-2">
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={requestCreate}
+                  onClick={() => requestCreate()}
                   tooltip="Nova nota"
                   className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                 >
@@ -172,6 +173,15 @@ export function AppSidebar({
               <SidebarGroupLabel>Conhecimento</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/painel"}
+                      onClick={() => router.push("/painel")}
+                      tooltip="Painel"
+                    >
+                      <LayoutDashboard /> Painel
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       isActive={pathname === "/notes" && !searchParams.get("tag")}

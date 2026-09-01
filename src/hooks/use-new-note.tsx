@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { NoteListItem } from "@/types/models";
 import { isEmptyStimulus, EMPTY_STIMULUS_NUDGE_AT } from "@/lib/note-health";
+import { noteTemplate, type NoteTemplateKey } from "@/lib/note-templates";
 import {
   Dialog,
   DialogContent,
@@ -35,11 +36,16 @@ export function useNewNote() {
   const [creating, setCreating] = useState(false);
 
   const emptyStimuli = (notes ?? []).filter(isEmptyStimulus);
+  // Guarda o template pedido enquanto o aviso de Estímulos vazios está
+  // aberto — "Criar mesmo assim" precisa lembrar qual template foi
+  // escolhido antes do aviso aparecer, não voltar pro padrão em branco.
+  const pendingTemplate = useRef<NoteTemplateKey | undefined>(undefined);
 
-  async function create() {
+  async function create(templateKey?: NoteTemplateKey) {
     setCreating(true);
     try {
-      const note = await postJSON<{ id: string }>("/api/notes", {});
+      const template = noteTemplate(templateKey);
+      const note = await postJSON<{ id: string }>("/api/notes", { content: template.content });
       setOpen(false);
       router.push(`/notes/${note.id}`);
     } catch (err) {
@@ -49,11 +55,12 @@ export function useNewNote() {
     }
   }
 
-  function requestCreate() {
+  function requestCreate(templateKey?: NoteTemplateKey) {
     if (emptyStimuli.length >= EMPTY_STIMULUS_NUDGE_AT) {
+      pendingTemplate.current = templateKey;
       setOpen(true);
     } else {
-      create();
+      create(templateKey);
     }
   }
 
@@ -87,7 +94,7 @@ export function useNewNote() {
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button onClick={create} disabled={creating}>
+          <Button onClick={() => create(pendingTemplate.current)} disabled={creating}>
             Criar mesmo assim
           </Button>
         </DialogFooter>

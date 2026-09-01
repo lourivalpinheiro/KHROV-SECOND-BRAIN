@@ -40,6 +40,7 @@ import { createWikiLinkExtension } from "./wiki-link-extension";
 import { FlashcardHighlight, FLASHCARD_STUDY_EVENT } from "./flashcard-highlight-extension";
 import { ConceptHighlight, CONCEPT_STUDY_EVENT } from "./concept-highlight-extension";
 import { Flashcard } from "./flashcard-node";
+import { Chart } from "./chart-node";
 import { Bookmark } from "./bookmark-node";
 import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
@@ -196,6 +197,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       FlashcardHighlight,
       ConceptHighlight,
       Flashcard,
+      Chart,
       Bookmark,
     ],
     [noteId]
