@@ -42,7 +42,7 @@ const ENTRY_TYPES: EntryType[] = ["INCOME", "EXPENSE", "SAVINGS", "DAILY", "CRED
 const RECURRENCES: RecurrenceKind[] = ["NONE", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"];
 
 function money(v: number) {
-  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function firstDayOfMonth(d: Date) {
@@ -361,7 +361,7 @@ function NewEntryForm({
 
       {isCreditCard && installmentsNum > 1 && (
         <p className="text-xs text-muted-foreground">
-          {installmentsNum}x de R$ {(Number(amount) / installmentsNum || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          {installmentsNum}x de R$ {(Number(amount) / installmentsNum || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           , uma por mês a partir da data acima.
         </p>
       )}

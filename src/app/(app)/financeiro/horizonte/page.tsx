@@ -39,7 +39,7 @@ type MetricKey = (typeof METRICS)[number]["key"];
 const WEEKDAY_HEADERS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 function money(v: number) {
-  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function buildMonthWeeks(year: number, month: number): (string | null)[][] {

@@ -42,7 +42,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 function money(v: number) {
-  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function PocketDetail({ pocketId }: { pocketId: string }) {

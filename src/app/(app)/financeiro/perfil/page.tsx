@@ -159,7 +159,7 @@ export default function PerfilFinanceiroPage() {
                   <span>{v.name}</span>
                   <div className="flex items-center gap-2">
                     <span className="tabular-nums text-muted-foreground">
-                      R$ {v.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {v.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <button
                       type="button"
@@ -197,7 +197,7 @@ export default function PerfilFinanceiroPage() {
           </div>
 
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-            Teto de hoje: <span className="font-semibold">R$ {cap.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+            Teto de hoje: <span className="font-semibold">R$ {cap.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
       </div>
