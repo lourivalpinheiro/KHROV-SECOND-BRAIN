@@ -3,17 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
-import { PiggyBank, Plus, Target } from "lucide-react";
+import { LineChart, PiggyBank, Plus, Target } from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { goalProgressPercent } from "@/lib/finance";
+import { goalProgressPercent, toLocalDateKey } from "@/lib/finance";
 import { toast } from "sonner";
+
+type PocketKind = "SAVINGS" | "INVESTMENT";
 
 type Pocket = {
   id: string;
   name: string;
+  kind: PocketKind;
   balance: number;
   targetAmount: number | null;
   targetDate: string | null;
@@ -25,15 +30,18 @@ function money(v: number) {
 }
 
 /**
- * Cofrinhos — potes de economia nomeados. Lançamentos do tipo Economia
- * podem apontar pra um; a página dedicada de cada um (histórico + tabela)
- * fica em /financeiro/cofrinhos/[id]. Definir meta (valor/prazo) pra um
- * cofrinho é lá em /financeiro/metas.
+ * Cofrinhos — potes nomeados, de dois tipos: Poupança (metas, reservas) ou
+ * Investimento (todo investimento precisa morar aqui — não existe saldo
+ * de investimento solto no perfil). Lançamentos do tipo Economia podem
+ * apontar pra qualquer um; a página dedicada (histórico + tabela) fica em
+ * /financeiro/cofrinhos/[id]. Meta (valor/prazo) se define em /financeiro/metas.
  */
 export default function CofrinhosPage() {
   const { data: pockets, isLoading } = useSWR<Pocket[]>("/api/finance/pockets", fetcher);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<PocketKind>("SAVINGS");
+  const [startingBalance, setStartingBalance] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function create() {
@@ -43,10 +51,18 @@ export default function CofrinhosPage() {
     }
     setSaving(true);
     try {
-      await postJSON("/api/finance/pockets", { name: name.trim() });
+      await postJSON("/api/finance/pockets", {
+        name: name.trim(),
+        kind,
+        startingBalance: startingBalance || 0,
+        startingBalanceDate: toLocalDateKey(new Date()),
+      });
       setName("");
+      setStartingBalance("");
+      setKind("SAVINGS");
       setShowForm(false);
       await mutate("/api/finance/pockets");
+      await mutate("/api/finance/summary");
       toast.success("Cofrinho criado.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar.");
@@ -69,10 +85,35 @@ export default function CofrinhosPage() {
         </div>
 
         {showForm && (
-          <div className="mb-4 flex items-end gap-2 rounded-xl border bg-card p-3">
-            <div className="flex-1 space-y-1.5">
-              <label className="text-xs text-muted-foreground">Nome</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Viagem, Reserva de emergência..." />
+          <div className="mb-4 space-y-3 rounded-xl border bg-card p-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="col-span-2 space-y-1.5">
+                <Label className="text-xs">Nome</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Viagem, Tesouro Direto..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={kind} onValueChange={(v) => setKind((v as PocketKind) ?? "SAVINGS")}>
+                  <SelectTrigger size="sm" className="w-full">
+                    <SelectValue>{() => (kind === "SAVINGS" ? "Poupança" : "Investimento")}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAVINGS">Poupança</SelectItem>
+                    <SelectItem value="INVESTMENT">Investimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Já tem guardado (R$)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  value={startingBalance}
+                  onChange={(e) => setStartingBalance(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
             <Button onClick={create} disabled={saving}>
               Criar
@@ -84,7 +125,7 @@ export default function CofrinhosPage() {
           <Skeleton className="h-40 w-full rounded-xl" />
         ) : !pockets || pockets.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Nenhum cofrinho ainda — crie um acima pra começar a guardar dinheiro com um destino.
+            Nenhum cofrinho ainda — crie um acima pra começar a guardar (ou investir) com um destino.
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -97,10 +138,12 @@ export default function CofrinhosPage() {
                   href={`/financeiro/cofrinhos/${p.id}`}
                   className="rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
                 >
-                  <div className="mb-1 flex items-center gap-1.5 text-sm font-medium">
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {p.kind === "INVESTMENT" ? <LineChart className="size-3.5" /> : <PiggyBank className="size-3.5" />}
+                    {p.kind === "INVESTMENT" ? "Investimento" : "Poupança"}
                     {hasGoal && <Target className="size-3.5 text-primary" />}
-                    {p.name}
                   </div>
+                  <div className="text-sm font-medium">{p.name}</div>
                   <div className="text-xl font-semibold tracking-tight">{money(p.balance)}</div>
                   {hasGoal && (
                     <div className="mt-2">

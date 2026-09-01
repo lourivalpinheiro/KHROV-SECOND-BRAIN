@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ArrowLeft, ChevronLeft, ChevronRight, PiggyBank, Settings2, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, LineChart, PiggyBank, Settings2, Trash2 } from "lucide-react";
 import { fetcher, deleteJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 type Pocket = {
   id: string;
   name: string;
+  kind: "SAVINGS" | "INVESTMENT";
   balance: number;
   targetAmount: number | null;
   targetDate: string | null;
@@ -119,8 +120,15 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
 
         <div className="mb-6 flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <PiggyBank className="size-5 text-muted-foreground" />
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{pocket.name}</h1>
+            {pocket.kind === "INVESTMENT" ? (
+              <LineChart className="size-5 text-muted-foreground" />
+            ) : (
+              <PiggyBank className="size-5 text-muted-foreground" />
+            )}
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{pocket.name}</h1>
+              <p className="text-xs text-muted-foreground">{pocket.kind === "INVESTMENT" ? "Investimento" : "Poupança"}</p>
+            </div>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" render={<Link href={`/financeiro/metas?pocket=${pocketId}`} />} title="Definir meta">

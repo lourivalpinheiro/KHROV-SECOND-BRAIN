@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     const days = projectHorizon({
       entries,
-      startingBalance: profile.startingBalance,
+      startingBalance: profile.startingCashBalance,
       startingBalanceDate: startKey,
       rangeStart: fromKey,
       rangeEnd: toKey,

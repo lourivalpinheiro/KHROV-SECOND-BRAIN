@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import useSWR, { mutate } from "swr";
 import { Plus, Settings2, Trash2 } from "lucide-react";
 import { fetcher, patchJSON, postJSON, deleteJSON } from "@/lib/api-client";
@@ -10,19 +11,21 @@ import { Label } from "@/components/ui/label";
 import { dailyAllowance, toLocalDateKey } from "@/lib/finance";
 import { toast } from "sonner";
 
-type FinanceProfile = { startingBalance: number; startingBalanceDate: string } | null;
+type FinanceProfile = { startingCashBalance: number; startingBalanceDate: string } | null;
 type BudgetVariable = { id: string; name: string; amount: number };
 
 /**
- * Onde entram o saldo inicial (ponto de partida do saldo/projeção — ver
- * src/lib/finance.ts) e as "variáveis" livres que somadas ÷ 30 formam o
- * teto de gasto do dia.
+ * Onde entra o saldo inicial de CAIXA (ponto de partida do saldo/projeção
+ * — ver src/lib/finance.ts) e as "variáveis" livres que somadas ÷ 30
+ * formam o teto de gasto do dia. Investimento não entra aqui — vive
+ * sempre num cofrinho (ver /financeiro/cofrinhos), não como um número
+ * solto no perfil.
  */
 export default function PerfilFinanceiroPage() {
   const { data: profile, isLoading } = useSWR<FinanceProfile>("/api/finance/profile", fetcher);
   const { data: variables } = useSWR<BudgetVariable[]>("/api/finance/budget-variables", fetcher);
 
-  const [startingBalance, setStartingBalance] = useState("0");
+  const [startingCashBalance, setStartingCashBalance] = useState("0");
   const [startingBalanceDate, setStartingBalanceDate] = useState(() => toLocalDateKey(new Date()));
   const [saving, setSaving] = useState(false);
   const loaded = useRef(false);
@@ -33,19 +36,19 @@ export default function PerfilFinanceiroPage() {
   useEffect(() => {
     if (!profile || loaded.current) return;
     loaded.current = true;
-    setStartingBalance(String(profile.startingBalance));
+    setStartingCashBalance(String(profile.startingCashBalance));
     setStartingBalanceDate(profile.startingBalanceDate);
   }, [profile]);
 
   async function saveProfile() {
-    const balance = Number(startingBalance);
-    if (!Number.isFinite(balance)) {
-      toast.error("Saldo inválido.");
+    const cash = Number(startingCashBalance);
+    if (!Number.isFinite(cash)) {
+      toast.error("Saldo de caixa inválido.");
       return;
     }
     setSaving(true);
     try {
-      await patchJSON("/api/finance/profile", { startingBalance: balance, startingBalanceDate });
+      await patchJSON("/api/finance/profile", { startingCashBalance: cash, startingBalanceDate });
       await mutate("/api/finance/profile");
       await mutate("/api/finance/summary");
       toast.success("Perfil salvo.");
@@ -103,10 +106,14 @@ export default function PerfilFinanceiroPage() {
 
         <div className="mb-6 space-y-5 rounded-xl border bg-card p-5">
           <div>
-            <h2 className="text-sm font-semibold">Saldo inicial</h2>
+            <h2 className="text-sm font-semibold">Saldo inicial de caixa</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              &ldquo;Eu tenho R$X hoje&rdquo; — ponto de partida do saldo atual e da projeção. Pode reajustar quando
-              quiser (ex: conferir com o extrato real).
+              &ldquo;Eu tenho R$X na conta hoje&rdquo; — ponto de partida do saldo atual e da projeção. Investimento não
+              entra aqui: crie um cofrinho do tipo Investimento em{" "}
+              <Link href="/financeiro/cofrinhos" className="text-primary hover:underline">
+                Cofrinhos
+              </Link>
+              . Pode reajustar quando quiser (ex: conferir com o extrato real).
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -117,8 +124,8 @@ export default function PerfilFinanceiroPage() {
                 type="number"
                 inputMode="decimal"
                 step="0.01"
-                value={startingBalance}
-                onChange={(e) => setStartingBalance(e.target.value)}
+                value={startingCashBalance}
+                onChange={(e) => setStartingCashBalance(e.target.value)}
               />
             </div>
             <div className="space-y-2">

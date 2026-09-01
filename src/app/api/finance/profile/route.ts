@@ -20,8 +20,8 @@ export async function PATCH(req: NextRequest) {
     const userId = await requireUserId();
     const body = await req.json().catch(() => ({}));
 
-    const startingBalance = Number(body.startingBalance);
-    if (!Number.isFinite(startingBalance)) return jsonError("Saldo inicial inválido.");
+    const startingCashBalance = Number(body.startingCashBalance);
+    if (!Number.isFinite(startingCashBalance)) return jsonError("Saldo de caixa inválido.");
 
     const dateStr = typeof body.startingBalanceDate === "string" && DATE_RE.test(body.startingBalanceDate) ? body.startingBalanceDate : null;
     if (!dateStr) return jsonError("Data do saldo inicial inválida.");
@@ -29,8 +29,8 @@ export async function PATCH(req: NextRequest) {
 
     const profile = await prisma.financeProfile.upsert({
       where: { userId },
-      update: { startingBalance, startingBalanceDate },
-      create: { userId, startingBalance, startingBalanceDate },
+      update: { startingCashBalance, startingBalanceDate },
+      create: { userId, startingCashBalance, startingBalanceDate },
     });
 
     return NextResponse.json(profile);

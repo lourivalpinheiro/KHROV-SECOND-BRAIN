@@ -30,15 +30,18 @@ export async function GET() {
         recurrenceEndDate: e.recurrenceEndDate ? e.recurrenceEndDate.toISOString().slice(0, 10) : null,
         savingsDirection: e.savingsDirection,
       }));
-      const balance = pocketBalance(entries, new Date(`${rangeStartKey}T00:00:00`), new Date(`${todayKey}T00:00:00`));
+      const movement = pocketBalance(entries, new Date(`${rangeStartKey}T00:00:00`), new Date(`${todayKey}T00:00:00`));
       return {
         id: p.id,
         name: p.name,
+        kind: p.kind,
+        startingBalance: p.startingBalance,
+        startingBalanceDate: p.startingBalanceDate ? p.startingBalanceDate.toISOString().slice(0, 10) : null,
         targetAmount: p.targetAmount,
         targetDate: p.targetDate ? p.targetDate.toISOString().slice(0, 10) : null,
         monthlyContribution: p.monthlyContribution,
         createdAt: p.createdAt,
-        balance,
+        balance: p.startingBalance + movement,
       };
     });
 
@@ -55,6 +58,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return jsonError("Nome do cofrinho é obrigatório.");
+    const kind = body.kind === "INVESTMENT" ? "INVESTMENT" : "SAVINGS";
+
+    let startingBalance = 0;
+    let startingBalanceDate: Date | null = null;
+    if (body.startingBalance !== undefined && body.startingBalance !== null && body.startingBalance !== "") {
+      const n = Number(body.startingBalance);
+      if (!Number.isFinite(n)) return jsonError("Saldo inicial do cofrinho inválido.");
+      startingBalance = n;
+      startingBalanceDate = new Date(`${(body.startingBalanceDate as string) || toLocalDateKey(new Date())}T00:00:00.000Z`);
+    }
 
     let targetAmount: number | null = null;
     let targetDate: Date | null = null;
@@ -75,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     const pocket = await prisma.financeSavingsPocket.create({
-      data: { userId, name, targetAmount, targetDate, monthlyContribution },
+      data: { userId, name, kind, startingBalance, startingBalanceDate, targetAmount, targetDate, monthlyContribution },
     });
     return NextResponse.json(pocket, { status: 201 });
   } catch (res) {

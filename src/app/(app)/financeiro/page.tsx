@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, PiggyBank, Target, Thermometer, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, LineChart, PiggyBank, Target, Thermometer, Wallet } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 
 type Summary = {
   profile: unknown | null;
-  currentBalance?: number;
+  currentCashBalance?: number;
+  investmentBalance?: number;
+  netWorth?: number;
   totalIncomeThisMonth?: number;
   totalExpenseThisMonth?: number;
   dailyAllowance?: number;
@@ -76,9 +78,23 @@ export default function FinanceiroDashboardPage() {
           </div>
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
-              <Wallet className="size-4" /> Saldo atual
+              <Wallet className="size-4" /> Caixa atual
             </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.currentBalance)}</div>
+            <div className="text-2xl font-semibold tracking-tight">{money(summary.currentCashBalance)}</div>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <LineChart className="size-4" /> Investido
+            </div>
+            <div className="text-2xl font-semibold tracking-tight">{money(summary.investmentBalance)}</div>
+            <p className="mt-0.5 text-xs text-muted-foreground">soma dos cofrinhos de investimento</p>
+          </div>
+          <div className="rounded-xl border bg-card p-4 sm:col-span-2 lg:col-span-1">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <PiggyBank className="size-4" /> Patrimônio total
+            </div>
+            <div className="text-2xl font-semibold tracking-tight">{money(summary.netWorth)}</div>
+            <p className="mt-0.5 text-xs text-muted-foreground">caixa + investido</p>
           </div>
         </div>
 

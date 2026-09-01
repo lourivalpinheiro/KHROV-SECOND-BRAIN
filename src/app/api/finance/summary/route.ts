@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
-import { dailyAllowance, dateFromKey, projectHorizon, toLocalDateKey, type FinanceEntryLite } from "@/lib/finance";
+import { dailyAllowance, dateFromKey, pocketBalance, projectHorizon, toLocalDateKey, type FinanceEntryLite } from "@/lib/finance";
 
 function firstDayOfMonthKey(d: Date) {
   return toLocalDateKey(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -28,6 +28,24 @@ export async function GET() {
     const variables = await prisma.financeBudgetVariable.findMany({ where: { userId } });
     const dailyCap = dailyAllowance(variables);
 
+    // Investimento não é um número solto — é a soma dos cofrinhos kind=INVESTMENT.
+    const investmentPockets = await prisma.financeSavingsPocket.findMany({
+      where: { userId, kind: "INVESTMENT" },
+      include: { entries: { select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true } } },
+    });
+    const investmentBalance = investmentPockets.reduce((sum, p) => {
+      const entries: FinanceEntryLite[] = p.entries.map((e) => ({
+        date: toLocalDateKey(e.date),
+        type: e.type,
+        amount: e.amount,
+        recurrence: e.recurrence,
+        recurrenceEndDate: e.recurrenceEndDate ? toLocalDateKey(e.recurrenceEndDate) : null,
+        savingsDirection: e.savingsDirection,
+      }));
+      const movement = pocketBalance(entries, dateFromKey("2000-01-01"), now);
+      return sum + p.startingBalance + movement;
+    }, 0);
+
     const rows = await prisma.financeEntry.findMany({
       where: {
         userId,
@@ -47,14 +65,14 @@ export async function GET() {
 
     const monthDays = projectHorizon({
       entries,
-      startingBalance: profile.startingBalance,
+      startingBalance: profile.startingCashBalance,
       startingBalanceDate: startKey,
       rangeStart: monthStart,
       rangeEnd: monthEnd,
     });
 
     const todayRow = monthDays.find((d) => d.date === todayKey);
-    const currentBalance = todayRow?.balance ?? profile.startingBalance;
+    const currentCashBalance = todayRow?.balance ?? profile.startingCashBalance;
     const spentToday = todayRow?.dailySpend ?? 0;
 
     const totalIncome = monthDays.reduce((sum, d) => sum + d.income, 0);
@@ -62,7 +80,9 @@ export async function GET() {
 
     return NextResponse.json({
       profile,
-      currentBalance,
+      currentCashBalance,
+      investmentBalance,
+      netWorth: currentCashBalance + investmentBalance,
       totalIncomeThisMonth: totalIncome,
       totalExpenseThisMonth: totalExpense,
       dailyAllowance: dailyCap,

@@ -27,16 +27,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       recurrenceEndDate: e.recurrenceEndDate ? e.recurrenceEndDate.toISOString().slice(0, 10) : null,
       savingsDirection: e.savingsDirection,
     }));
-    const balance = pocketBalance(entries, rangeStart, now);
+    const movement = pocketBalance(entries, rangeStart, now);
 
     return NextResponse.json({
       id: pocket.id,
       name: pocket.name,
+      kind: pocket.kind,
+      startingBalance: pocket.startingBalance,
+      startingBalanceDate: pocket.startingBalanceDate ? toLocalDateKey(pocket.startingBalanceDate) : null,
       targetAmount: pocket.targetAmount,
       targetDate: pocket.targetDate ? toLocalDateKey(pocket.targetDate) : null,
       monthlyContribution: pocket.monthlyContribution,
       createdAt: pocket.createdAt,
-      balance,
+      balance: pocket.startingBalance + movement,
     });
   } catch (res) {
     if (res instanceof NextResponse) return res;
@@ -54,12 +57,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json().catch(() => ({}));
     const data: {
       name?: string;
+      kind?: "SAVINGS" | "INVESTMENT";
+      startingBalance?: number;
+      startingBalanceDate?: Date | null;
       targetAmount?: number | null;
       targetDate?: Date | null;
       monthlyContribution?: number | null;
     } = {};
 
     if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
+    if (body.kind === "SAVINGS" || body.kind === "INVESTMENT") data.kind = body.kind;
+
+    if (body.startingBalance !== undefined) {
+      const n = Number(body.startingBalance);
+      if (!Number.isFinite(n)) return jsonError("Saldo inicial do cofrinho inválido.");
+      data.startingBalance = n;
+    }
+    if (body.startingBalanceDate === null || body.startingBalanceDate === "") {
+      data.startingBalanceDate = null;
+    } else if (typeof body.startingBalanceDate === "string") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.startingBalanceDate)) return jsonError("Data do saldo inicial inválida.");
+      data.startingBalanceDate = new Date(`${body.startingBalanceDate}T00:00:00.000Z`);
+    }
 
     if (body.targetAmount === null || body.targetAmount === "") {
       data.targetAmount = null;

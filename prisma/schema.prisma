@@ -225,16 +225,18 @@ model HealthProfileHistory {
 }
 
 /**
- * Ponto de partida do saldo — "eu tenho R$X hoje" registrado numa data.
- * Saldo atual/projeção = esse valor + a soma de todos os lançamentos a
- * partir de `startingBalanceDate` (ver src/lib/finance.ts). Editável a
- * qualquer momento (ex: recalibrar depois de conferir o extrato real).
+ * Ponto de partida do saldo de CAIXA — "eu tenho R$X hoje" — registrado
+ * numa data. É o que a projeção/horizonte usa (ver src/lib/finance.ts).
+ * Investimento não tem campo aqui de propósito: todo investimento precisa
+ * estar dentro de um cofrinho (FinanceSavingsPocket com kind=INVESTMENT),
+ * cada um com seu próprio saldo inicial — permite ter mais de um
+ * investimento nomeado, não só um número solto.
  */
 model FinanceProfile {
   id                  String   @id @default(cuid())
   userId              String   @unique
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startingBalance     Float    @default(0)
+  startingCashBalance Float    @default(0)
   startingBalanceDate DateTime @default(now()) @db.Date
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -269,19 +271,31 @@ enum SavingsDirection {
   WITHDRAWAL
 }
 
+/** SAVINGS = cofrinho comum (meta, reserva); INVESTMENT = onde todo investimento precisa morar — não existe saldo de investimento solto, sempre dentro de um cofrinho desses. */
+enum PocketKind {
+  SAVINGS
+  INVESTMENT
+}
+
 /**
- * Um "cofrinho" — pote de economia nomeado (ex: "Viagem", "Reserva").
- * Lançamentos do tipo SAVINGS podem apontar pra um, e a página dedicada
- * do cofrinho (histórico + tabela) só olha os lançamentos dele. Os três
- * campos de meta são opcionais — preenchidos, o cofrinho também aparece
- * em /financeiro/metas com uma barra de progresso (saldo do cofrinho ÷
- * targetAmount).
+ * Um "cofrinho" — pote nomeado (ex: "Viagem", "Reserva", "Tesouro
+ * Direto"). Lançamentos do tipo SAVINGS podem apontar pra um, e a página
+ * dedicada do cofrinho (histórico + tabela) só olha os lançamentos dele.
+ * `startingBalance`/`startingBalanceDate` são pro caso de já existir
+ * dinheiro ali antes de começar a registrar (ex: já tinha R$5000
+ * investidos) — o saldo do cofrinho é esse valor + depósitos − resgates.
+ * Os três campos de meta são opcionais — preenchidos, o cofrinho também
+ * aparece em /financeiro/metas com uma barra de progresso.
  */
 model FinanceSavingsPocket {
-  id     String @id @default(cuid())
+  id     String     @id @default(cuid())
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   name   String
+  kind   PocketKind @default(SAVINGS)
+
+  startingBalance     Float     @default(0)
+  startingBalanceDate DateTime? @db.Date
 
   targetAmount        Float?
   targetDate          DateTime? @db.Date
