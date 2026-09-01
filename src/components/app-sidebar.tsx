@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   Activity,
+  ArrowLeftRight,
   BookOpenText,
   Brain,
   BrainCircuit,
@@ -14,10 +15,13 @@ import {
   LineChart,
   Network,
   NotebookPen,
+  PiggyBank,
   Plus,
   Search,
   Settings2,
   Tag as TagIcon,
+  Target,
+  Thermometer,
   Trash2,
   TrendingUp,
 } from "lucide-react";
@@ -39,7 +43,7 @@ import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
-type ModuleKey = "notas" | "saude";
+type ModuleKey = "notas" | "saude" | "financeiro";
 
 export function AppSidebar({
   user,
@@ -54,7 +58,11 @@ export function AppSidebar({
 
   // Deriva do caminho em vez de guardar estado à parte — assim um link
   // direto ou um F5 sempre abre no módulo certo, sem precisar sincronizar.
-  const activeModule: ModuleKey = pathname.startsWith("/saude") ? "saude" : "notas";
+  const activeModule: ModuleKey = pathname.startsWith("/saude")
+    ? "saude"
+    : pathname.startsWith("/financeiro")
+      ? "financeiro"
+      : "notas";
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +70,10 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar collapsible="icon" className={cn(activeModule === "saude" && "theme-saude")}>
+    <Sidebar
+      collapsible="icon"
+      className={cn(activeModule === "saude" && "theme-saude", activeModule === "financeiro" && "theme-financeiro")}
+    >
       <SidebarHeader className="gap-3">
         <div className="flex items-center gap-2 pt-1">
           {/* size-8 pra bater exatamente com o tamanho que o SidebarMenuButton
@@ -103,6 +114,18 @@ export function AppSidebar({
             )}
           >
             Saúde
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/financeiro")}
+            className={cn(
+              "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+              activeModule === "financeiro"
+                ? "bg-sidebar text-sidebar-foreground shadow-xs"
+                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            )}
+          >
+            R$
           </button>
         </div>
 
@@ -237,7 +260,7 @@ export function AppSidebar({
               </SidebarMenuItem>
             </SidebarMenu>
           </>
-        ) : (
+        ) : activeModule === "saude" ? (
           <SidebarGroup className="p-0 px-2">
             <SidebarGroupLabel>Saúde</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -287,6 +310,68 @@ export function AppSidebar({
                   <SidebarMenuButton
                     isActive={pathname === "/saude/perfil"}
                     onClick={() => router.push("/saude/perfil")}
+                    tooltip="Perfil"
+                  >
+                    <Settings2 /> Perfil
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          <SidebarGroup className="p-0 px-2">
+            <SidebarGroupLabel>Financeiro</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/financeiro"}
+                    onClick={() => router.push("/financeiro")}
+                    tooltip="Dashboard"
+                  >
+                    <Activity /> Dashboard
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith("/financeiro/lancamentos")}
+                    onClick={() => router.push("/financeiro/lancamentos")}
+                    tooltip="Lançamentos"
+                  >
+                    <ArrowLeftRight /> Lançamentos
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/financeiro/horizonte"}
+                    onClick={() => router.push("/financeiro/horizonte")}
+                    tooltip="Horizonte"
+                  >
+                    <Thermometer /> Horizonte
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith("/financeiro/cofrinhos")}
+                    onClick={() => router.push("/financeiro/cofrinhos")}
+                    tooltip="Cofrinhos"
+                  >
+                    <PiggyBank /> Cofrinhos
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/financeiro/metas"}
+                    onClick={() => router.push("/financeiro/metas")}
+                    tooltip="Metas"
+                  >
+                    <Target /> Metas
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/financeiro/perfil"}
+                    onClick={() => router.push("/financeiro/perfil")}
                     tooltip="Perfil"
                   >
                     <Settings2 /> Perfil
