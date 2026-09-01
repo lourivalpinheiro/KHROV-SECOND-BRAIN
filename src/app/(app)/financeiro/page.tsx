@@ -1,20 +1,36 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, LineChart, PiggyBank, Target, Thermometer, Wallet } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowLeftRight,
+  ArrowUpCircle,
+  LineChart,
+  PiggyBank,
+  Target,
+  Thermometer,
+  Wallet,
+} from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toLocalDateKey } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 type Summary = {
   profile: unknown | null;
+  periodFrom?: string;
+  periodTo?: string;
   currentCashBalance?: number;
   investmentBalance?: number;
   netWorth?: number;
-  totalIncomeThisMonth?: number;
-  totalExpenseThisMonth?: number;
+  totalIncomeInPeriod?: number;
+  totalExpenseInPeriod?: number;
+  periodEndBalance?: number;
   dailyAllowance?: number;
   spentToday?: number;
   remainingToday?: number;
@@ -24,13 +40,51 @@ function money(v: number | undefined) {
   return `R$ ${(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent,
+  highlight,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={cn("rounded-xl border bg-card p-4", highlight && "border-primary/30 bg-primary/5")}>
+      <div className={cn("mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground", highlight && "text-primary")}>
+        <Icon className={cn("size-4", accent)} /> {label}
+      </div>
+      <div className="text-2xl font-semibold tracking-tight">{value}</div>
+      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function firstDayOfMonth(d: Date) {
+  return toLocalDateKey(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+function lastDayOfMonth(d: Date) {
+  return toLocalDateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+}
+
 /**
- * Dashboard do módulo Financeiro: entradas/saídas do mês, saldo atual e a
- * previsão de gasto de hoje bem na frente. Sem orientação financeira aqui
- * — só soma e subtrai o que você registrou (ver src/lib/finance.ts).
+ * Dashboard do módulo Financeiro: entradas/saídas/saldo final do período
+ * filtrado numa linha, caixa/investido/patrimônio (sempre de hoje, não
+ * filtrável) na outra, e a previsão de gasto de hoje embaixo. Sem
+ * orientação financeira aqui — só soma e subtrai o que você registrou
+ * (ver src/lib/finance.ts).
  */
 export default function FinanceiroDashboardPage() {
-  const { data: summary, isLoading } = useSWR<Summary>("/api/finance/summary", fetcher);
+  const now = new Date();
+  const [fromDate, setFromDate] = useState(firstDayOfMonth(now));
+  const [toDate, setToDate] = useState(lastDayOfMonth(now));
+  const { data: summary, isLoading } = useSWR<Summary>(`/api/finance/summary?from=${fromDate}&to=${toDate}`, fetcher);
 
   if (isLoading) {
     return (
@@ -63,39 +117,46 @@ export default function FinanceiroDashboardPage() {
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Financeiro — resumo</h1>
         </div>
 
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border bg-card p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <ArrowUpCircle className="size-4 text-primary" /> Entradas (mês)
-            </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.totalIncomeThisMonth)}</div>
+        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+          <div className="space-y-1">
+            <Label className="text-xs">De</Label>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-36" />
           </div>
-          <div className="rounded-xl border bg-card p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <ArrowDownCircle className="size-4 text-destructive" /> Saídas (mês)
-            </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.totalExpenseThisMonth)}</div>
+          <div className="space-y-1">
+            <Label className="text-xs">Até</Label>
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-36" />
           </div>
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
-              <Wallet className="size-4" /> Caixa atual
-            </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.currentCashBalance)}</div>
-          </div>
-          <div className="rounded-xl border bg-card p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <LineChart className="size-4" /> Investido
-            </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.investmentBalance)}</div>
-            <p className="mt-0.5 text-xs text-muted-foreground">soma dos cofrinhos de investimento</p>
-          </div>
-          <div className="rounded-xl border bg-card p-4 sm:col-span-2 lg:col-span-1">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <PiggyBank className="size-4" /> Patrimônio total
-            </div>
-            <div className="text-2xl font-semibold tracking-tight">{money(summary.netWorth)}</div>
-            <p className="mt-0.5 text-xs text-muted-foreground">caixa + investido</p>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => {
+              setFromDate(firstDayOfMonth(new Date()));
+              setToDate(lastDayOfMonth(new Date()));
+            }}
+          >
+            Mês atual
+          </Button>
+        </div>
+
+        {/* Linha 1: entrada, saída, saldo final — do período filtrado */}
+        <div className="mb-3 grid gap-3 sm:grid-cols-3">
+          <StatCard icon={ArrowUpCircle} label="Entradas (período)" value={money(summary.totalIncomeInPeriod)} accent="text-primary" />
+          <StatCard icon={ArrowDownCircle} label="Saídas (período)" value={money(summary.totalExpenseInPeriod)} accent="text-destructive" />
+          <StatCard
+            icon={Wallet}
+            label="Saldo final (período)"
+            value={money(summary.periodEndBalance)}
+            sub="projetado, considerando a previsão diária pros dias futuros"
+            highlight
+          />
+        </div>
+
+        {/* Linha 2: caixa, investido, patrimônio — sempre de hoje */}
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          <StatCard icon={Wallet} label="Caixa atual" value={money(summary.currentCashBalance)} />
+          <StatCard icon={LineChart} label="Investido" value={money(summary.investmentBalance)} sub="soma dos cofrinhos de investimento" />
+          <StatCard icon={PiggyBank} label="Patrimônio total" value={money(summary.netWorth)} sub="caixa + investido" />
         </div>
 
         <div className="mb-6 rounded-xl border bg-card p-4">

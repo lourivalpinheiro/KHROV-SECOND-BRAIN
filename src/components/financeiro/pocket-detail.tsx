@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts";
 import { ArrowLeft, ChevronLeft, ChevronRight, LineChart, PiggyBank, Settings2, Trash2 } from "lucide-react";
 import { fetcher, deleteJSON } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ type Pocket = {
   targetAmount: number | null;
   targetDate: string | null;
   monthlyContribution: number | null;
+  cdiPercentage: number | null;
+  maturityDate: string | null;
 };
 
 type EntryRow = {
@@ -34,11 +36,23 @@ type EntryRow = {
   savingsDirection: "DEPOSIT" | "WITHDRAWAL";
 };
 
+type CdiResponse = {
+  enabled: boolean;
+  cdiPercentage?: number;
+  maturityDate?: string;
+  points: { date: string; principal: number; adjusted: number }[];
+};
+
 const PAGE_SIZE = 10;
 
 const chartConfig = {
   deposits: { label: "Depósitos", color: "var(--primary)" },
   withdrawals: { label: "Resgates", color: "var(--destructive)" },
+} satisfies ChartConfig;
+
+const cdiChartConfig = {
+  principal: { label: "Aportado", color: "var(--muted-foreground)" },
+  adjusted: { label: "Com rendimento", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 function money(v: number) {
@@ -58,6 +72,20 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
   const { data: pocket, isLoading: loadingPocket } = useSWR<Pocket>(`/api/finance/pockets/${pocketId}`, fetcher);
   const entriesQuery = `/api/finance/entries?pocketId=${pocketId}&from=${fromDate}&to=${toDate}`;
   const { data: entries, isLoading: loadingEntries } = useSWR<EntryRow[]>(entriesQuery, fetcher);
+
+  const cdiEligible = !!(pocket?.cdiPercentage && pocket?.maturityDate);
+  const { data: cdiData, isLoading: loadingCdi } = useSWR<CdiResponse>(
+    cdiEligible ? `/api/finance/pockets/${pocketId}/cdi` : null,
+    fetcher
+  );
+  const cdiChartData = useMemo(() => cdiData?.points.map((p) => ({ date: p.date, principal: p.principal, adjusted: p.adjusted })) ?? [], [cdiData]);
+  const cdiYield = useMemo(() => {
+    if (!cdiData || cdiData.points.length === 0) return null;
+    const last = cdiData.points[cdiData.points.length - 1];
+    const yieldValue = last.adjusted - last.principal;
+    const yieldPct = last.principal > 0 ? (yieldValue / last.principal) * 100 : 0;
+    return { value: yieldValue, pct: yieldPct };
+  }, [cdiData]);
 
   const chartData = useMemo(() => {
     if (!entries) return [];
@@ -155,6 +183,51 @@ export function PocketDetail({ pocketId }: { pocketId: string }) {
             </div>
           )}
         </div>
+
+        {cdiEligible && (
+          <div className="mb-6 rounded-xl border bg-card p-4">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                Rendimento — {pocket.cdiPercentage}% do CDI até{" "}
+                {pocket.maturityDate!.slice(8, 10)}/{pocket.maturityDate!.slice(5, 7)}/{pocket.maturityDate!.slice(0, 4)}
+              </div>
+              {cdiYield && (
+                <span className="text-sm font-semibold text-primary">
+                  +{money(cdiYield.value)} ({cdiYield.pct.toFixed(2)}%)
+                </span>
+              )}
+            </div>
+            {loadingCdi ? (
+              <Skeleton className="h-48 w-full" />
+            ) : !cdiData || cdiData.points.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">
+                Ainda sem dados suficientes pra calcular — volte depois do primeiro depósito.
+              </p>
+            ) : (
+              <ChartContainer config={cdiChartConfig} className="aspect-auto h-56 w-full">
+                <RechartsLineChart data={cdiChartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    minTickGap={32}
+                    tickFormatter={(v: string) => `${v.slice(8, 10)}/${v.slice(5, 7)}`}
+                  />
+                  <YAxis tickLine={false} axisLine={false} width={40} domain={["dataMin - 10", "dataMax + 10"]} />
+                  <ChartTooltip content={<ChartTooltipContent labelFormatter={(v) => `${String(v).slice(8, 10)}/${String(v).slice(5, 7)}/${String(v).slice(0, 4)}`} />} />
+                  <Line dataKey="principal" type="monotone" stroke="var(--color-principal)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                  <Line dataKey="adjusted" type="monotone" stroke="var(--color-adjusted)" strokeWidth={2} dot={false} />
+                </RechartsLineChart>
+              </ChartContainer>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Taxa diária real do CDI (Banco Central) composta dia a dia — não é garantia, é o que teria rendido com a
+              série publicada até agora.
+            </p>
+          </div>
+        )}
 
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
           <div className="space-y-1">

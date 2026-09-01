@@ -16,10 +16,13 @@ import { toast } from "sonner";
 type Pocket = {
   id: string;
   name: string;
+  kind: "SAVINGS" | "INVESTMENT";
   balance: number;
   targetAmount: number | null;
   targetDate: string | null;
   monthlyContribution: number | null;
+  cdiPercentage: number | null;
+  maturityDate: string | null;
 };
 
 function money(v: number) {
@@ -95,6 +98,8 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
   const [monthlyContribution, setMonthlyContribution] = useState(
     pocket.monthlyContribution ? String(pocket.monthlyContribution) : ""
   );
+  const [cdiPercentage, setCdiPercentage] = useState(pocket.cdiPercentage ? String(pocket.cdiPercentage) : "");
+  const [maturityDate, setMaturityDate] = useState(pocket.maturityDate ?? "");
   const [saving, setSaving] = useState(false);
 
   const hasGoal = pocket.targetAmount && pocket.targetAmount > 0;
@@ -116,6 +121,8 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
         targetAmount: targetAmount === "" ? null : Number(targetAmount),
         targetDate: targetDate || null,
         monthlyContribution: monthlyContribution === "" ? null : Number(monthlyContribution),
+        cdiPercentage: pocket.kind === "INVESTMENT" ? (cdiPercentage === "" ? null : Number(cdiPercentage)) : undefined,
+        maturityDate: pocket.kind === "INVESTMENT" ? maturityDate || null : undefined,
       });
       await mutate("/api/finance/pockets");
       toast.success("Meta salva.");
@@ -177,6 +184,25 @@ function GoalCard({ pocket, editing, onToggleEdit }: { pocket: Pocket; editing: 
               onChange={(e) => setMonthlyContribution(e.target.value)}
             />
           </div>
+          {pocket.kind === "INVESTMENT" && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">% do CDI</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  value={cdiPercentage}
+                  onChange={(e) => setCdiPercentage(e.target.value)}
+                  placeholder="Ex: 110"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Vencimento</Label>
+                <Input type="date" value={maturityDate} onChange={(e) => setMaturityDate(e.target.value)} />
+              </div>
+            </>
+          )}
           <div className="sm:col-span-3">
             <Button size="sm" onClick={save} disabled={saving}>
               Salvar meta

@@ -370,6 +370,15 @@ export function AppSidebar({
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
+                    isActive={pathname === "/financeiro/tags"}
+                    onClick={() => router.push("/financeiro/tags")}
+                    tooltip="Tags"
+                  >
+                    <TagIcon /> Tags
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
                     isActive={pathname === "/financeiro/perfil"}
                     onClick={() => router.push("/financeiro/perfil")}
                     tooltip="Perfil"

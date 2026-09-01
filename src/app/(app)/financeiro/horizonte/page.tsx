@@ -80,14 +80,6 @@ export default function HorizontePage() {
 
   const { data, isLoading } = useSWR<HorizonResponse>(`/api/finance/horizon?from=${fromKey}&to=${toKey}`, fetcher);
   const byDate = useMemo(() => new Map((data?.days ?? []).map((d) => [d.date, d])), [data]);
-  const maxAbs = useMemo(() => {
-    let m = 0;
-    for (const d of data?.days ?? []) {
-      const v = Math.abs(d[metric]);
-      if (v > m) m = v;
-    }
-    return m;
-  }, [data, metric]);
 
   function shiftMonths(delta: number) {
     setAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -143,7 +135,6 @@ export default function HorizontePage() {
                 month={m}
                 byDate={byDate}
                 metric={metric}
-                maxAbs={maxAbs}
                 onSelect={setSelectedDay}
               />
             ))}
@@ -151,8 +142,9 @@ export default function HorizontePage() {
         )}
 
         <p className="mt-4 text-xs text-muted-foreground">
-          Cor calibrada pelo maior valor absoluto visível na página atual — clique num dia pra ver o detalhamento
-          completo (entradas, saídas, diário, cartão, economias e saldo).
+          Vermelho abaixo de zero, amarelo até R$ 1.000, verde claro até R$ 2.000, verde escuro até R$ 3.000, dourado
+          dali pra cima — clique num dia pra ver o detalhamento completo (entradas, saídas, diário, cartão, economias
+          e saldo).
         </p>
       </div>
 
@@ -197,13 +189,11 @@ function MonthGrid({
   month,
   byDate,
   metric,
-  maxAbs,
   onSelect,
 }: {
   month: Date;
   byDate: Map<string, DayBreakdown>;
   metric: MetricKey;
-  maxAbs: number;
   onSelect: (d: DayBreakdown) => void;
 }) {
   const weeks = useMemo(() => buildMonthWeeks(month.getFullYear(), month.getMonth()), [month]);
@@ -224,7 +214,7 @@ function MonthGrid({
               if (!dateKey) return <div key={di} />;
               const day = byDate.get(dateKey);
               const value = day ? day[metric] : 0;
-              const { bg, fg } = heatColor(value, maxAbs);
+              const { bg, fg } = heatColor(value);
               return (
                 <button
                   key={dateKey}

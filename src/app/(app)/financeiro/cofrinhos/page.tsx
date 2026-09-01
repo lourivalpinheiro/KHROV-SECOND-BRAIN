@@ -23,6 +23,8 @@ type Pocket = {
   targetAmount: number | null;
   targetDate: string | null;
   monthlyContribution: number | null;
+  cdiPercentage: number | null;
+  maturityDate: string | null;
 };
 
 function money(v: number) {
@@ -42,6 +44,8 @@ export default function CofrinhosPage() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<PocketKind>("SAVINGS");
   const [startingBalance, setStartingBalance] = useState("");
+  const [cdiPercentage, setCdiPercentage] = useState("");
+  const [maturityDate, setMaturityDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function create() {
@@ -56,9 +60,13 @@ export default function CofrinhosPage() {
         kind,
         startingBalance: startingBalance || 0,
         startingBalanceDate: toLocalDateKey(new Date()),
+        cdiPercentage: kind === "INVESTMENT" && cdiPercentage ? cdiPercentage : null,
+        maturityDate: kind === "INVESTMENT" && maturityDate ? maturityDate : null,
       });
       setName("");
       setStartingBalance("");
+      setCdiPercentage("");
+      setMaturityDate("");
       setKind("SAVINGS");
       setShowForm(false);
       await mutate("/api/finance/pockets");
@@ -115,6 +123,31 @@ export default function CofrinhosPage() {
                 />
               </div>
             </div>
+
+            {kind === "INVESTMENT" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">% do CDI (opcional)</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={cdiPercentage}
+                    onChange={(e) => setCdiPercentage(e.target.value)}
+                    placeholder="Ex: 110"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Vencimento (opcional)</Label>
+                  <Input type="date" value={maturityDate} onChange={(e) => setMaturityDate(e.target.value)} />
+                </div>
+                <p className="col-span-2 text-xs text-muted-foreground">
+                  Preenchendo os dois, a página do cofrinho calcula o rendimento real dia a dia com o CDI de verdade
+                  (Banco Central) e mostra um gráfico de evolução.
+                </p>
+              </div>
+            )}
+
             <Button onClick={create} disabled={saving}>
               Criar
             </Button>
@@ -141,6 +174,7 @@ export default function CofrinhosPage() {
                   <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                     {p.kind === "INVESTMENT" ? <LineChart className="size-3.5" /> : <PiggyBank className="size-3.5" />}
                     {p.kind === "INVESTMENT" ? "Investimento" : "Poupança"}
+                    {p.cdiPercentage && <span>· {p.cdiPercentage}% CDI</span>}
                     {hasGoal && <Target className="size-3.5 text-primary" />}
                   </div>
                   <div className="text-sm font-medium">{p.name}</div>
