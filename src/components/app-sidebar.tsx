@@ -19,6 +19,7 @@ import {
   Settings2,
   Tag as TagIcon,
   Trash2,
+  TrendingUp,
 } from "lucide-react";
 import { useNewNote } from "@/hooks/use-new-note";
 import {
@@ -257,7 +258,7 @@ export function AppSidebar({
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    isActive={pathname === "/saude/caderno"}
+                    isActive={pathname.startsWith("/saude/caderno")}
                     onClick={() => router.push("/saude/caderno")}
                     tooltip="Caderno"
                   >
@@ -271,6 +272,15 @@ export function AppSidebar({
                     tooltip="Histórico"
                   >
                     <LineChart /> Histórico
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === "/saude/previsao"}
+                    onClick={() => router.push("/saude/previsao")}
+                    tooltip="Previsão"
+                  >
+                    <TrendingUp /> Previsão
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

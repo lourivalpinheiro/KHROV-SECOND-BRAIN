@@ -43,6 +43,12 @@ export const WEEKDAY_LABELS_LONG = [
   "Sábado",
 ] as const;
 
+/** "Agosto de 2026" — usado pra agrupar as folhas do caderno de treino por mês. */
+export function monthYearLabel(d: Date): string {
+  const s = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(d);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** YYYY-MM-DD local (não UTC) — pra "hoje" bater com o fuso de quem está usando o app. */
 export function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -108,6 +114,70 @@ export function computeSupplementStreak(days: DayRecord[], today: Date): number 
     (d) => d.supplement === true,
     () => true
   );
+}
+
+export type WeightPoint = { recordedAt: string; weightKg: number };
+
+export type WeightTrend = {
+  slopePerDay: number;
+  slopePerWeek: number;
+  intercept: number;
+  firstDate: Date;
+  residualStdDev: number;
+  n: number;
+};
+
+/**
+ * Regressão linear simples (mínimos quadrados) de peso × tempo, sobre os
+ * snapshots do histórico — não é bem "machine learning" de verdade, é a
+ * ferramenta certa pro volume de dado que um checkpoint mensal gera.
+ * Precisa de pelo menos 2 registros em datas diferentes.
+ */
+export function computeWeightTrend(points: WeightPoint[]): WeightTrend | null {
+  const sorted = points
+    .map((p) => ({ x: new Date(p.recordedAt).getTime(), y: p.weightKg }))
+    .sort((a, b) => a.x - b.x);
+  const distinctX = new Set(sorted.map((p) => p.x));
+  if (distinctX.size < 2) return null;
+
+  const firstMs = sorted[0].x;
+  const xs = sorted.map((p) => (p.x - firstMs) / 86400000); // dias desde o primeiro registro
+  const ys = sorted.map((p) => p.y);
+  const n = xs.length;
+  const xMean = xs.reduce((a, b) => a + b, 0) / n;
+  const yMean = ys.reduce((a, b) => a + b, 0) / n;
+
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - xMean) * (ys[i] - yMean);
+    den += (xs[i] - xMean) ** 2;
+  }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = yMean - slope * xMean;
+
+  let ssRes = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = intercept + slope * xs[i];
+    ssRes += (ys[i] - pred) ** 2;
+  }
+  const residualStdDev = n > 2 ? Math.sqrt(ssRes / (n - 2)) : 0;
+
+  return { slopePerDay: slope, slopePerWeek: slope * 7, intercept, firstDate: new Date(firstMs), residualStdDev, n };
+}
+
+/**
+ * Projeta o peso numa data futura a partir da tendência — regra de bolso
+ * estatística ("se o ritmo dos últimos registros continuar assim"), não
+ * uma previsão médica. A faixa cresce quanto mais longe da última
+ * observação, pra deixar claro que é uma extrapolação, não uma certeza.
+ */
+export function predictWeight(trend: WeightTrend, targetDate: Date): { estimate: number; low: number; high: number; daysAhead: number } {
+  const daysAhead = (targetDate.getTime() - trend.firstDate.getTime()) / 86400000;
+  const estimate = trend.intercept + trend.slopePerDay * daysAhead;
+  const base = Math.max(trend.residualStdDev, 0.3);
+  const band = base * 1.96 * Math.sqrt(1 + Math.max(daysAhead, 0) / 90);
+  return { estimate, low: estimate - band, high: estimate + band, daysAhead };
 }
 
 function computeStreak(

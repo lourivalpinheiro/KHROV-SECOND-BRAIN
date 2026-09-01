@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 import {
@@ -12,9 +12,16 @@ import {
 } from "@/lib/health";
 
 const HISTORY_DAYS = 120;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Tudo que o dashboard da Saúde precisa num request só: perfil, semana atual e streaks. */
-export async function GET() {
+/**
+ * Tudo que o dashboard da Saúde precisa num request só: perfil, a semana
+ * de `?date=` (ou a atual, sem o parâmetro) e streaks. Streaks e a
+ * estimativa de calorias são sempre relativos a HOJE de verdade — só as
+ * estatísticas "desta semana" mudam com o filtro, senão navegar pro
+ * passado ia parecer que os streaks também "voltaram no tempo".
+ */
+export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const profile = await prisma.healthProfile.findUnique({ where: { userId } });
@@ -23,8 +30,12 @@ export async function GET() {
       return NextResponse.json({ profile: null });
     }
 
+    const { searchParams } = new URL(req.url);
+    const anchorParam = searchParams.get("date");
+    const anchorDate = anchorParam && DATE_RE.test(anchorParam) ? new Date(`${anchorParam}T00:00:00`) : new Date();
+
     const now = new Date();
-    const since = new Date(now);
+    const since = new Date(Math.min(now.getTime(), anchorDate.getTime()));
     since.setDate(since.getDate() - HISTORY_DAYS);
 
     const rows = await prisma.healthDay.findMany({
@@ -38,7 +49,7 @@ export async function GET() {
       supplement: r.supplement,
     }));
 
-    const weekKeys = weekDateKeys(now);
+    const weekKeys = weekDateKeys(anchorDate);
     const byKey = new Map(history.map((h) => [h.date, h]));
     const weekDays = weekKeys.map((key) => byKey.get(key) ?? { date: key, waterBottles: 0, gym: false, supplement: false });
 
@@ -56,6 +67,9 @@ export async function GET() {
 
     return NextResponse.json({
       profile,
+      weekStart: weekKeys[0],
+      weekEnd: weekKeys[6],
+      isCurrentWeek: weekKeys[0] === weekDateKeys(now)[0],
       litersThisWeek,
       daysWithWaterThisWeek,
       gymDaysAttendedThisWeek: gymDaysAttended,

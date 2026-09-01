@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { CartesianGrid, Line, LineChart as RechartsLineChart, XAxis, YAxis } from "recharts";
 import { BellRing, CircleCheck, LineChart, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { WEEKDAY_LABELS_LONG } from "@/lib/health";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +21,10 @@ type HistoryEntry = {
   gymPlanDays: number[];
   recordedAt: string;
 };
+
+const weightChartConfig = {
+  weightKg: { label: "Peso (kg)", color: "var(--primary)" },
+} satisfies ChartConfig;
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -96,6 +104,7 @@ function MonthlyCheckpoint({ entries }: { entries: HistoryEntry[] }) {
  */
 export default function HistoricoSaudePage() {
   const { data: entries, isLoading } = useSWR<HistoryEntry[]>("/api/health/history", fetcher);
+  const [yearFilter, setYearFilter] = useState<string>("all");
 
   if (isLoading) {
     return (
@@ -124,21 +133,72 @@ export default function HistoricoSaudePage() {
     );
   }
 
-  // entries vem do mais recente pro mais antigo.
-  const oldest = entries[entries.length - 1];
-  const newest = entries[0];
-  const totalWeightDelta = newest.weightKg - oldest.weightKg;
-  const showTotal = entries.length > 1;
+  const years = Array.from(new Set(entries.map((e) => new Date(e.recordedAt).getFullYear()))).sort((a, b) => b - a);
+  const filtered = yearFilter === "all" ? entries : entries.filter((e) => new Date(e.recordedAt).getFullYear() === Number(yearFilter));
+
+  // filtered vem do mais recente pro mais antigo.
+  const oldest = filtered[filtered.length - 1];
+  const newest = filtered[0];
+  const totalWeightDelta = newest && oldest ? newest.weightKg - oldest.weightKg : 0;
+  const showTotal = filtered.length > 1;
+  // Gráfico quer ordem cronológica (mais antigo primeiro), ao contrário da lista.
+  const chartData = [...filtered].reverse().map((e) => ({ date: e.recordedAt, weightKg: e.weightKg }));
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mb-6 flex items-center gap-2">
-          <LineChart className="size-5 text-muted-foreground" />
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Histórico</h1>
+        <div className="mb-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <LineChart className="size-5 text-muted-foreground" />
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Histórico</h1>
+          </div>
+          {years.length > 1 && (
+            <Select value={yearFilter} onValueChange={(v) => setYearFilter(v ?? "all")}>
+              <SelectTrigger size="sm" className="w-28">
+                <SelectValue>{() => (yearFilter === "all" ? "Todos os anos" : yearFilter)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os anos</SelectItem>
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <MonthlyCheckpoint entries={entries} />
+
+        <div className="mb-6 rounded-xl border bg-card p-4">
+          <div className="mb-3 text-xs font-medium text-muted-foreground">Peso ao longo do tempo</div>
+          <ChartContainer config={weightChartConfig} className="aspect-auto h-56 w-full">
+            <RechartsLineChart data={chartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                minTickGap={24}
+                tickFormatter={(value: string) => {
+                  const d = new Date(value);
+                  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+                }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={36}
+                domain={["dataMin - 2", "dataMax + 2"]}
+                tickFormatter={(v: number) => `${v}kg`}
+              />
+              <ChartTooltip content={<ChartTooltipContent labelFormatter={(value) => formatDate(String(value))} />} />
+              <Line dataKey="weightKg" type="monotone" stroke="var(--color-weightKg)" strokeWidth={2} dot={{ r: 3 }} />
+            </RechartsLineChart>
+          </ChartContainer>
+        </div>
 
         {showTotal && (
           <div className="mb-6 rounded-xl border bg-card p-4">
@@ -151,8 +211,8 @@ export default function HistoricoSaudePage() {
         )}
 
         <div className="space-y-2">
-          {entries.map((entry, i) => {
-            const prev = entries[i + 1];
+          {filtered.map((entry, i) => {
+            const prev = filtered[i + 1];
             const planLabel = entry.gymPlanDays.map((d) => WEEKDAY_LABELS_LONG[d].slice(0, 3)).join(", ") || "—";
             return (
               <div key={entry.id} className="rounded-xl border bg-card p-4">

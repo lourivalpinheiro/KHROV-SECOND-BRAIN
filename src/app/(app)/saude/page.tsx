@@ -1,15 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { Activity, Droplets, Dumbbell, Flame, CalendarCheck2, Pill, LineChart } from "lucide-react";
+import {
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Droplets,
+  Dumbbell,
+  Flame,
+  CalendarCheck2,
+  Pill,
+  LineChart,
+  TrendingUp,
+} from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WEEKDAY_LABELS_LONG } from "@/lib/health";
+import { toLocalDateKey, WEEKDAY_LABELS_LONG } from "@/lib/health";
+
+function shortDate(dateKey: string) {
+  return `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
+}
 
 type Summary = {
   profile: { weightKg: number; heightCm: number; waterGoalBottles: number; gymPlanDays: number[] } | null;
+  weekStart?: string;
+  weekEnd?: string;
+  isCurrentWeek?: boolean;
   litersThisWeek?: number;
   daysWithWaterThisWeek?: number;
   gymDaysAttendedThisWeek?: number;
@@ -52,7 +71,15 @@ function StatCard({
  * orientação médica — são regras gerais (ver src/lib/health.ts).
  */
 export default function SaudeDashboardPage() {
-  const { data: summary, isLoading } = useSWR<Summary>("/api/health/summary", fetcher);
+  const [anchor, setAnchor] = useState(() => toLocalDateKey(new Date()));
+  const { data: summary, isLoading } = useSWR<Summary>(`/api/health/summary?date=${anchor}`, fetcher);
+
+  function shiftWeek(deltaWeeks: number) {
+    const [y, m, d] = anchor.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + deltaWeeks * 7);
+    setAnchor(toLocalDateKey(date));
+  }
 
   if (isLoading) {
     return (
@@ -104,8 +131,27 @@ export default function SaudeDashboardPage() {
           </div>
         </div>
 
-        {/* Situação atual */}
-        <h2 className="mb-3 text-sm font-semibold tracking-tight text-muted-foreground">Sua situação esta semana</h2>
+        {/* Situação atual — navegável semana a semana */}
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight text-muted-foreground">
+            {summary.isCurrentWeek
+              ? "Sua situação esta semana"
+              : `Semana de ${shortDate(summary.weekStart ?? anchor)} a ${shortDate(summary.weekEnd ?? anchor)}`}
+          </h2>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => shiftWeek(-1)}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            {!summary.isCurrentWeek && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setAnchor(toLocalDateKey(new Date()))}>
+                Hoje
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="size-7" disabled={summary.isCurrentWeek} onClick={() => shiftWeek(1)}>
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             icon={Droplets}
@@ -176,6 +222,9 @@ export default function SaudeDashboardPage() {
           </Button>
           <Button variant="outline" render={<Link href="/saude/historico" />}>
             <LineChart /> Histórico
+          </Button>
+          <Button variant="outline" render={<Link href="/saude/previsao" />}>
+            <TrendingUp /> Previsão
           </Button>
         </div>
       </div>
