@@ -3,9 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
 
 /**
- * Dados para a visualização de grafo: todas as notas e as ligações
- * [[wikilink]] entre elas. Fora do grafo: notas na lixeira, e notas de
- * Córtex — são rascunho de sessão, ainda não processado, e poluiriam o
+ * Dados para a visualização de grafo: todas as notas, as ligações
+ * [[wikilink]] entre elas, e as tags de cada uma (o client sintetiza um nó
+ * de tag por tag e uma ligação nota→tag — sem isso, tags viviam fora do
+ * grafo, diferente do Obsidian). Fora do grafo: notas na lixeira, e notas
+ * de Córtex — são rascunho de sessão, ainda não processado, e poluiriam o
  * grafo (que é sobre conexões entre conhecimento já elaborado).
  */
 export async function GET() {
@@ -20,7 +22,7 @@ export async function GET() {
         select: {
           id: true,
           title: true,
-          tags: { select: { tag: { select: { name: true } } } },
+          tags: { select: { tag: { select: { id: true, name: true } } } },
         },
       }),
       prisma.noteLink.findMany({
@@ -33,7 +35,7 @@ export async function GET() {
       nodes: notes.map((n) => ({
         id: n.id,
         title: n.title,
-        tags: n.tags.map((t) => t.tag.name),
+        tags: n.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
       })),
       links: links.map((l) => ({ source: l.sourceNoteId, target: l.targetNoteId })),
     });

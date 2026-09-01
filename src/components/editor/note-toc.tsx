@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
-import { List } from "lucide-react";
+import { ChevronDown, List } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Heading = { level: number; text: string; pos: number };
 
@@ -25,6 +26,9 @@ function computeHeadings(editor: Editor): Heading[] {
  */
 export function NoteToc({ editor }: { editor: Editor | null }) {
   const [headings, setHeadings] = useState<Heading[]>([]);
+  // Colapsado por padrão — é consulta, não algo que precisa ocupar espaço
+  // toda vez que a nota abre. Quem quiser navegar pelos títulos, expande.
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!editor) return;
@@ -53,25 +57,32 @@ export function NoteToc({ editor }: { editor: Editor | null }) {
       aria-label="Sumário da nota"
       className="fixed top-24 right-4 z-20 hidden max-h-[60vh] w-48 overflow-y-auto rounded-lg border bg-card/95 p-2 text-xs shadow-sm backdrop-blur xl:block"
     >
-      <div className="mb-1.5 flex items-center gap-1.5 px-1 text-muted-foreground">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-1 py-0.5 text-muted-foreground hover:text-foreground"
+      >
         <List className="size-3.5" />
         <span className="font-medium">Sumário</span>
-      </div>
-      <ul className="space-y-0.5">
-        {headings.map((h, i) => (
-          <li key={i}>
-            <button
-              type="button"
-              onClick={() => goTo(h.pos)}
-              className="block w-full truncate rounded px-1.5 py-1 text-left text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-              style={{ paddingLeft: `${(h.level - minLevel) * 10 + 6}px` }}
-              title={h.text}
-            >
-              {h.text}
-            </button>
-          </li>
-        ))}
-      </ul>
+        <ChevronDown className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <ul className="mt-1.5 space-y-0.5">
+          {headings.map((h, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                onClick={() => goTo(h.pos)}
+                className="block w-full truncate rounded px-1.5 py-1 text-left text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+                style={{ paddingLeft: `${(h.level - minLevel) * 10 + 6}px` }}
+                title={h.text}
+              >
+                {h.text}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </nav>
   );
 }

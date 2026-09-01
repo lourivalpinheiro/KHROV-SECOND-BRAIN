@@ -4,7 +4,7 @@ import { requireUserId, jsonError } from "@/lib/api-utils";
 import { extractPlainText, extractLinkedNoteIds, type TiptapDoc } from "@/lib/doc-utils";
 import { syncNoteLinks, syncNoteTags } from "@/lib/notes-service";
 import { extractFlashcards } from "@/lib/flashcards";
-import { isNoteType, checkPromotion } from "@/lib/note-types";
+import { isNoteType, checkPromotion, pipelineIndex } from "@/lib/note-types";
 import { checkSemanticRelevance } from "@/lib/ai-note-checks";
 
 async function getOwnedNote(id: string, userId: string) {
@@ -26,6 +26,7 @@ export async function GET(
       include: {
         tags: { include: { tag: true } },
         attachments: true,
+        stageHistory: { orderBy: { createdAt: "asc" } },
       },
     });
 
@@ -61,6 +62,13 @@ export async function PATCH(
       data.content = contentDoc;
       data.plainText = extractPlainText(contentDoc);
     }
+
+    // Promoção pra frente no pipeline (nunca regressão — ver pipelineIndex)
+    // tira uma "foto" do content ANTES desta atualização e guarda em
+    // NoteStageHistory, rotulada com o estágio que está sendo deixado pra
+    // trás. É o que dá a linha do tempo da nota (Estímulo → Potenciação →
+    // Sinapse → Engrama) sem precisar duplicar a nota em si.
+    let isForwardPromotion = false;
 
     if (isNoteType(body.type)) {
       // A trava de fricção é validada aqui, no servidor — nunca só no
@@ -120,10 +128,18 @@ export async function PATCH(
         }
       }
 
+      isForwardPromotion = pipelineIndex(body.type) > pipelineIndex(existing.type);
       data.type = body.type;
     }
 
-    const note = await prisma.note.update({ where: { id }, data });
+    const note = await prisma.$transaction(async (tx) => {
+      if (isForwardPromotion) {
+        await tx.noteStageHistory.create({
+          data: { noteId: id, stage: existing.type, content: existing.content as object },
+        });
+      }
+      return tx.note.update({ where: { id }, data });
+    });
 
     if (Array.isArray(body.tags)) {
       await syncNoteTags(userId, id, body.tags as string[]);
@@ -135,7 +151,11 @@ export async function PATCH(
 
     const full = await prisma.note.findUnique({
       where: { id },
-      include: { tags: { include: { tag: true } }, attachments: true },
+      include: {
+        tags: { include: { tag: true } },
+        attachments: true,
+        stageHistory: { orderBy: { createdAt: "asc" } },
+      },
     });
 
     return NextResponse.json(full ?? note);
