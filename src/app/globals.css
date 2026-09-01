@@ -170,6 +170,29 @@
   --sidebar-ring: oklch(0.769 0.188 70.08);
 }
 
+/*
+ * Módulo Espiritual (ainda "em breve") — roxo/violeta, associação comum
+ * com contemplação/espiritualidade, e a única cor que ainda não apareceu
+ * nos outros três módulos.
+ */
+.theme-espiritual {
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.541 0.281 293.009);
+  --sidebar-primary: oklch(0.541 0.281 293.009);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent-foreground: oklch(0.541 0.281 293.009);
+  --sidebar-ring: oklch(0.541 0.281 293.009);
+}
+
+.dark .theme-espiritual {
+  --primary: oklch(0.606 0.25 292.717);
+  --ring: oklch(0.606 0.25 292.717);
+  --sidebar-primary: oklch(0.606 0.25 292.717);
+  --sidebar-accent-foreground: oklch(0.606 0.25 292.717);
+  --sidebar-ring: oklch(0.606 0.25 292.717);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -1,12 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import useSWR from "swr";
-import { BookOpenText, Brain, FileText, History, Layers, Network, Plus, Tag as TagIcon } from "lucide-react";
+import {
+  Activity,
+  ArrowLeftRight,
+  BookOpenText,
+  Brain,
+  CalendarCheck2,
+  FileText,
+  History,
+  Layers,
+  LineChart,
+  Moon,
+  Network,
+  NotebookPen,
+  PiggyBank,
+  Plus,
+  Settings2,
+  Tag as TagIcon,
+  Target,
+  Thermometer,
+  TrendingUp,
+} from "lucide-react";
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
 import { useNewNote } from "@/hooks/use-new-note";
+import { MODULES, moduleFromPathname } from "@/lib/modules";
 import {
   CommandDialog,
   CommandEmpty,
@@ -25,11 +46,16 @@ function todayLocalDate() {
 }
 
 /**
- * Busca rápida global (Cmd+K / Ctrl+K): criar nota, ir pra nota de hoje,
- * pular pra grafo/flashcards, ou buscar por nota/pasta/tag pelo nome.
+ * Busca rápida global (Cmd+K / Ctrl+K) — muda de conteúdo conforme o
+ * módulo aberto no momento (ver src/lib/modules.ts): em Notas/
+ * Conhecimento busca por nota/tag pelo nome, nos outros é um atalho de
+ * navegação pras páginas do módulo. Trocar de módulo direto daqui
+ * também funciona em qualquer um deles.
  */
 export function CommandPalette() {
   const router = useRouter();
+  const pathname = usePathname();
+  const activeModule = moduleFromPathname(pathname);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -57,10 +83,10 @@ export function CommandPalette() {
   }
 
   const { data: noteResults } = useSWR<SearchResult[]>(
-    open ? `/api/notes/search?q=${encodeURIComponent(debouncedQuery)}` : null,
+    open && activeModule === "notas" ? `/api/notes/search?q=${encodeURIComponent(debouncedQuery)}` : null,
     fetcher
   );
-  const { data: tags } = useSWR<TagDTO[]>(open ? "/api/tags" : null, fetcher);
+  const { data: tags } = useSWR<TagDTO[]>(open && activeModule === "notas" ? "/api/tags" : null, fetcher);
 
   const matchedTags = (tags ?? [])
     .filter((t) => t.name.toLowerCase().includes(debouncedQuery.toLowerCase()))
@@ -88,40 +114,110 @@ export function CommandPalette() {
       open={open}
       onOpenChange={onOpenChange}
       title="Busca rápida"
-      description="Buscar notas e tags, ou executar uma ação"
+      description="Buscar ou executar uma ação"
     >
-      <CommandInput placeholder="Buscar notas, tags..." value={query} onValueChange={setQuery} />
+      <CommandInput
+        placeholder={activeModule === "notas" ? "Buscar notas, tags..." : "Buscar uma ação..."}
+        value={query}
+        onValueChange={setQuery}
+      />
       <CommandList>
         <CommandEmpty>Nada encontrado.</CommandEmpty>
 
-        <CommandGroup heading="Ações">
-          <CommandItem onSelect={createNote}>
-            <Plus /> Nova nota
-          </CommandItem>
-          <CommandItem onSelect={openDailyNote}>
-            <Brain /> Sessão de hoje (Córtex)
-          </CommandItem>
-          <CommandItem onSelect={() => go("/cortex")}>
-            <Brain /> Ver Córtex
-          </CommandItem>
-          <CommandItem onSelect={() => go("/notes")}>
-            <FileText /> Todas as notas
-          </CommandItem>
-          <CommandItem onSelect={() => go("/graph")}>
-            <Network /> Grafo
-          </CommandItem>
-          <CommandItem onSelect={() => go("/flashcards")}>
-            <Layers /> Flashcards
-          </CommandItem>
-          <CommandItem onSelect={() => go("/timeline")}>
-            <History /> Linha do tempo
-          </CommandItem>
-          <CommandItem onSelect={() => go("/conceitos")}>
-            <BookOpenText /> Conceitos
-          </CommandItem>
+        {activeModule === "notas" && (
+          <CommandGroup heading="Ações">
+            <CommandItem onSelect={createNote}>
+              <Plus /> Nova nota
+            </CommandItem>
+            <CommandItem onSelect={openDailyNote}>
+              <Brain /> Sessão de hoje (Córtex)
+            </CommandItem>
+            <CommandItem onSelect={() => go("/cortex")}>
+              <Brain /> Ver Córtex
+            </CommandItem>
+            <CommandItem onSelect={() => go("/notes")}>
+              <FileText /> Todas as notas
+            </CommandItem>
+            <CommandItem onSelect={() => go("/graph")}>
+              <Network /> Grafo
+            </CommandItem>
+            <CommandItem onSelect={() => go("/flashcards")}>
+              <Layers /> Flashcards
+            </CommandItem>
+            <CommandItem onSelect={() => go("/timeline")}>
+              <History /> Linha do tempo
+            </CommandItem>
+            <CommandItem onSelect={() => go("/conceitos")}>
+              <BookOpenText /> Conceitos
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        {activeModule === "saude" && (
+          <CommandGroup heading="Saúde">
+            <CommandItem onSelect={() => go("/saude")}>
+              <Activity /> Dashboard
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/semana")}>
+              <CalendarCheck2 /> Semana
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/caderno")}>
+              <NotebookPen /> Caderno
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/sono")}>
+              <Moon /> Sono
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/historico")}>
+              <LineChart /> Histórico
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/previsao")}>
+              <TrendingUp /> Previsão
+            </CommandItem>
+            <CommandItem onSelect={() => go("/saude/perfil")}>
+              <Settings2 /> Perfil
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        {activeModule === "financeiro" && (
+          <CommandGroup heading="Financeiro">
+            <CommandItem onSelect={() => go("/financeiro")}>
+              <Activity /> Dashboard
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/lancamentos")}>
+              <ArrowLeftRight /> Lançamentos
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/horizonte")}>
+              <Thermometer /> Horizonte
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/cofrinhos")}>
+              <PiggyBank /> Cofrinhos
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/metas")}>
+              <Target /> Metas
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/tags")}>
+              <TagIcon /> Tags
+            </CommandItem>
+            <CommandItem onSelect={() => go("/financeiro/perfil")}>
+              <Settings2 /> Perfil
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        <CommandSeparator />
+        <CommandGroup heading="Trocar de módulo">
+          {MODULES.map((m) => {
+            const MIcon = m.icon;
+            return (
+              <CommandItem key={m.key} value={`module-${m.key}`} onSelect={() => go(m.href)}>
+                <MIcon /> {m.label}
+              </CommandItem>
+            );
+          })}
         </CommandGroup>
 
-        {(noteResults?.length ?? 0) > 0 && (
+        {activeModule === "notas" && (noteResults?.length ?? 0) > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Notas">
@@ -134,7 +230,7 @@ export function CommandPalette() {
           </>
         )}
 
-        {debouncedQuery && matchedTags.length > 0 && (
+        {activeModule === "notas" && debouncedQuery && matchedTags.length > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Tags">

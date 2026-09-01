@@ -7,12 +7,14 @@ import {
   ArrowLeftRight,
   BookOpenText,
   Brain,
-  BrainCircuit,
   CalendarCheck2,
+  Check,
+  ChevronsUpDown,
   FileText,
   History,
   Layers,
   LineChart,
+  Moon,
   Network,
   NotebookPen,
   PiggyBank,
@@ -39,11 +41,11 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
-
-type ModuleKey = "notas" | "saude" | "financeiro";
+import { MODULES, moduleDef, moduleFromPathname } from "@/lib/modules";
 
 export function AppSidebar({
   user,
@@ -58,11 +60,9 @@ export function AppSidebar({
 
   // Deriva do caminho em vez de guardar estado à parte — assim um link
   // direto ou um F5 sempre abre no módulo certo, sem precisar sincronizar.
-  const activeModule: ModuleKey = pathname.startsWith("/saude")
-    ? "saude"
-    : pathname.startsWith("/financeiro")
-      ? "financeiro"
-      : "notas";
+  const activeModule = moduleFromPathname(pathname);
+  const active = moduleDef(activeModule);
+  const ActiveIcon = active.icon;
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -70,10 +70,7 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className={cn(activeModule === "saude" && "theme-saude", activeModule === "financeiro" && "theme-financeiro")}
-    >
+    <Sidebar collapsible="icon" className={cn(active.themeClass)}>
       <SidebarHeader className="gap-3">
         <div className="flex items-center gap-2 pt-1">
           {/* size-8 pra bater exatamente com o tamanho que o SidebarMenuButton
@@ -81,53 +78,44 @@ export function AppSidebar({
               ficam centralizados em caixas de larguras diferentes, e o ícone
               do logo sai levemente deslocado em relação aos ícones abaixo. */}
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BrainCircuit className="size-4" />
+            <ActiveIcon className="size-4" />
           </div>
           <span className="truncate font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
             Khrov
           </span>
         </div>
 
-        {/* Trocador de módulo — mesma casca (cabeçalho, busca, rodapé) pros
-            dois, só a lista de navegação abaixo muda. */}
-        <div className="flex gap-1 rounded-lg bg-sidebar-accent/50 p-0.5 group-data-[collapsible=icon]:hidden">
-          <button
-            type="button"
-            onClick={() => router.push("/notes")}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-              activeModule === "notas"
-                ? "bg-sidebar text-sidebar-foreground shadow-xs"
-                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            )}
-          >
-            Notas
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/saude")}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-              activeModule === "saude"
-                ? "bg-sidebar text-sidebar-foreground shadow-xs"
-                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            )}
-          >
-            Saúde
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/financeiro")}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-              activeModule === "financeiro"
-                ? "bg-sidebar text-sidebar-foreground shadow-xs"
-                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            )}
-          >
-            R$
-          </button>
-        </div>
+        {/* Trocador de módulo — 4 nomes não cabem como abas de texto sem
+            espremer, então é um dropdown (ícone + nome do módulo atual,
+            clica pra ver os outros 3) em vez de uma pílula de segmentos. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
+              >
+                <ActiveIcon className="size-3.5 shrink-0 text-primary" />
+                <span className="flex-1 truncate text-xs font-medium">{active.label}</span>
+                <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+              </button>
+            }
+          />
+          <DropdownMenuContent align="start" className="w-56">
+            {MODULES.map((m) => {
+              const MIcon = m.icon;
+              return (
+                <DropdownMenuItem key={m.key} onClick={() => router.push(m.href)}>
+                  <MIcon /> {m.label}
+                  <span className="ml-auto flex items-center gap-1.5">
+                    {m.comingSoon && <span className="text-[10px] text-muted-foreground">em breve</span>}
+                    {activeModule === m.key && <Check className="size-3.5" />}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {activeModule === "notas" && (
           <form
@@ -177,7 +165,7 @@ export function AppSidebar({
             </SidebarGroup>
 
             <SidebarGroup className="p-0 px-2">
-              <SidebarGroupLabel>Notas</SidebarGroupLabel>
+              <SidebarGroupLabel>Conhecimento</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
                   <SidebarMenuItem>
@@ -261,134 +249,188 @@ export function AppSidebar({
             </SidebarMenu>
           </>
         ) : activeModule === "saude" ? (
+          <>
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Rotina</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
+                      <Activity /> Dashboard
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/semana"}
+                      onClick={() => router.push("/saude/semana")}
+                      tooltip="Semana"
+                    >
+                      <CalendarCheck2 /> Semana
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/saude/caderno")}
+                      onClick={() => router.push("/saude/caderno")}
+                      tooltip="Caderno"
+                    >
+                      <NotebookPen /> Caderno
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/sono"}
+                      onClick={() => router.push("/saude/sono")}
+                      tooltip="Sono"
+                    >
+                      <Moon /> Sono
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Evolução</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/historico"}
+                      onClick={() => router.push("/saude/historico")}
+                      tooltip="Histórico"
+                    >
+                      <LineChart /> Histórico
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/saude/previsao"}
+                      onClick={() => router.push("/saude/previsao")}
+                      tooltip="Previsão"
+                    >
+                      <TrendingUp /> Previsão
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator className="my-0" />
+
+            <SidebarMenu className="gap-1 px-2">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/saude/perfil"}
+                  onClick={() => router.push("/saude/perfil")}
+                  tooltip="Perfil"
+                >
+                  <Settings2 /> Perfil
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </>
+        ) : activeModule === "espiritual" ? (
           <SidebarGroup className="p-0 px-2">
-            <SidebarGroupLabel>Saúde</SidebarGroupLabel>
+            <SidebarGroupLabel>Espiritual</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={pathname === "/saude"} onClick={() => router.push("/saude")} tooltip="Dashboard">
-                    <Activity /> Dashboard
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/semana"}
-                    onClick={() => router.push("/saude/semana")}
-                    tooltip="Semana"
-                  >
-                    <CalendarCheck2 /> Semana
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith("/saude/caderno")}
-                    onClick={() => router.push("/saude/caderno")}
-                    tooltip="Caderno"
-                  >
-                    <NotebookPen /> Caderno
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/historico"}
-                    onClick={() => router.push("/saude/historico")}
-                    tooltip="Histórico"
-                  >
-                    <LineChart /> Histórico
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/previsao"}
-                    onClick={() => router.push("/saude/previsao")}
-                    tooltip="Previsão"
-                  >
-                    <TrendingUp /> Previsão
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/saude/perfil"}
-                    onClick={() => router.push("/saude/perfil")}
-                    tooltip="Perfil"
-                  >
-                    <Settings2 /> Perfil
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
+              <p className="px-2 text-xs text-sidebar-foreground/60">Em breve disponível.</p>
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
-          <SidebarGroup className="p-0 px-2">
-            <SidebarGroupLabel>Financeiro</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/financeiro"}
-                    onClick={() => router.push("/financeiro")}
-                    tooltip="Dashboard"
-                  >
-                    <Activity /> Dashboard
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith("/financeiro/lancamentos")}
-                    onClick={() => router.push("/financeiro/lancamentos")}
-                    tooltip="Lançamentos"
-                  >
-                    <ArrowLeftRight /> Lançamentos
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/financeiro/horizonte"}
-                    onClick={() => router.push("/financeiro/horizonte")}
-                    tooltip="Horizonte"
-                  >
-                    <Thermometer /> Horizonte
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith("/financeiro/cofrinhos")}
-                    onClick={() => router.push("/financeiro/cofrinhos")}
-                    tooltip="Cofrinhos"
-                  >
-                    <PiggyBank /> Cofrinhos
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/financeiro/metas"}
-                    onClick={() => router.push("/financeiro/metas")}
-                    tooltip="Metas"
-                  >
-                    <Target /> Metas
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/financeiro/tags"}
-                    onClick={() => router.push("/financeiro/tags")}
-                    tooltip="Tags"
-                  >
-                    <TagIcon /> Tags
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={pathname === "/financeiro/perfil"}
-                    onClick={() => router.push("/financeiro/perfil")}
-                    tooltip="Perfil"
-                  >
-                    <Settings2 /> Perfil
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <>
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Movimentar</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/financeiro"}
+                      onClick={() => router.push("/financeiro")}
+                      tooltip="Dashboard"
+                    >
+                      <Activity /> Dashboard
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/financeiro/lancamentos")}
+                      onClick={() => router.push("/financeiro/lancamentos")}
+                      tooltip="Lançamentos"
+                    >
+                      <ArrowLeftRight /> Lançamentos
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/financeiro/horizonte"}
+                      onClick={() => router.push("/financeiro/horizonte")}
+                      tooltip="Horizonte"
+                    >
+                      <Thermometer /> Horizonte
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Guardar</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/financeiro/cofrinhos")}
+                      onClick={() => router.push("/financeiro/cofrinhos")}
+                      tooltip="Cofrinhos"
+                    >
+                      <PiggyBank /> Cofrinhos
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/financeiro/metas"}
+                      onClick={() => router.push("/financeiro/metas")}
+                      tooltip="Metas"
+                    >
+                      <Target /> Metas
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Organizar</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/financeiro/tags"}
+                      onClick={() => router.push("/financeiro/tags")}
+                      tooltip="Tags"
+                    >
+                      <TagIcon /> Tags
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator className="my-0" />
+
+            <SidebarMenu className="gap-1 px-2">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/financeiro/perfil"}
+                  onClick={() => router.push("/financeiro/perfil")}
+                  tooltip="Perfil"
+                >
+                  <Settings2 /> Perfil
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </>
         )}
       </SidebarContent>
 
