@@ -30,6 +30,15 @@ model User {
   financeTags            FinanceTag[]
   financeBudgetVariables FinanceBudgetVariable[]
   financeSavingsPockets  FinanceSavingsPocket[]
+
+  spiritualProfile      SpiritualProfile?
+  spiritualDays         SpiritualDay[]
+  sermons               Sermon[]
+  sermonSeries          SermonSeries[]
+  prayerRequests        PrayerRequest[]
+  bibleReadingProgress  BibleReadingProgress[]
+  memoryVerses          MemoryVerse[]
+  gratitudeEntries      GratitudeEntry[]
 }
 
 /**
@@ -423,4 +432,174 @@ model FinanceBudgetVariable {
   updatedAt DateTime @updatedAt
 
   @@index([userId, order])
+}
+
+/**
+ * Perfil do módulo Espiritual — hoje só guarda os dias planejados de ida à
+ * igreja (Domingo=0 .. Sábado=6, mesma convenção da Saúde). Terça, quinta
+ * e domingo é o padrão, mas fica configurável do mesmo jeito que os dias
+ * de academia.
+ */
+model SpiritualProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchPlanDays Int[]    @default([0, 2, 4])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/**
+ * Um registro por dia: oração ao acordar, oração antes de dormir,
+ * devocional e presença na igreja — tudo boolean simples, igual ao
+ * HealthDay. Presença na igreja pode ser marcada em qualquer dia, não só
+ * nos planejados (mesma regra do "gym" da Saúde).
+ */
+model SpiritualDay {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime @db.Date
+  prayerMorning  Boolean  @default(false)
+  prayerNight    Boolean  @default(false)
+  devotional     Boolean  @default(false)
+  churchAttended Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+enum SermonStatus {
+  DRAFT
+  READY
+  PREACHED
+}
+
+/** Uma série de sermões (ex: "Provérbios em 6 partes") — só título + descrição, os sermões apontam pra ela. */
+model SermonSeries {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  sermons     Sermon[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * Preparação de sermão — CRUD dedicado e leve (não usa o motor de notas do
+ * Conhecimento: sem backlinks/grafo/flashcards, só título, passagem,
+ * status e um corpo de texto rico próprio, ver sermon-editor.tsx).
+ * Opcionalmente pertence a uma série, com `order` como a posição dele
+ * dentro dela (parte 1, parte 2...).
+ */
+model Sermon {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  passage   String?
+  status    SermonStatus  @default(DRAFT)
+  /** Data planejada de pregação (ou em que foi pregado, se já passou). */
+  date      DateTime?     @db.Date
+  content   Json
+  seriesId  String?
+  series    SermonSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, date])
+  @@index([seriesId, order])
+}
+
+enum PrayerRequestStatus {
+  ACTIVE
+  ANSWERED
+}
+
+/** Pedidos de oração contínuos — marca como respondido quando for o caso, sem apagar (fica como registro). */
+model PrayerRequest {
+  id         String               @id @default(cuid())
+  userId     String
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  notes      String?
+  status     PrayerRequestStatus  @default(ACTIVE)
+  createdAt  DateTime             @default(now())
+  answeredAt DateTime?
+
+  @@index([userId, status])
+}
+
+/**
+ * Progresso de leitura bíblica: um capítulo lido = uma linha. A lista de
+ * livros/capítulos em si é dado fixo (ver src/lib/bible.ts), não fica no
+ * banco — só o que já foi marcado como lido.
+ */
+model BibleReadingProgress {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book    String
+  chapter Int
+  readAt  DateTime @default(now())
+
+  @@unique([userId, book, chapter])
+  @@index([userId])
+}
+
+enum MemoryVerseStatus {
+  LEARNING
+  MEMORIZED
+}
+
+/**
+ * Versículos pra memorizar, com repetição espaçada de verdade — mesmo
+ * algoritmo (SM-2 simplificado) e mesmos 3 graus dos flashcards do
+ * Conhecimento (ver src/lib/spaced-repetition.ts), só que os campos de
+ * agendamento moram direto aqui em vez de numa tabela de review à parte,
+ * já que não existe "nota" por trás de um versículo.
+ */
+model MemoryVerse {
+  id             String            @id @default(cuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reference      String
+  text           String?
+  status         MemoryVerseStatus @default(LEARNING)
+  easeFactor     Float             @default(2.5)
+  intervalDays   Int               @default(0)
+  repetitions    Int               @default(0)
+  dueAt          DateTime          @default(now())
+  lastReviewedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, dueAt])
+}
+
+/**
+ * Diário de gratidão: uma "entrada" por dia, cada uma com uma lista livre
+ * de itens ("do que sou grato hoje") — upsert por (userId, date), igual
+ * ao SpiritualDay, só que em vez de booleans guarda uma lista de textos.
+ */
+model GratitudeEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  items     String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

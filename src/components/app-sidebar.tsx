@@ -5,12 +5,16 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   Activity,
   ArrowLeftRight,
+  BookMarked,
   BookOpenText,
+  BookmarkCheck,
   Brain,
   CalendarCheck2,
   Check,
   ChevronsUpDown,
   FileText,
+  HandHeart,
+  HeartHandshake,
   History,
   Layers,
   LineChart,
@@ -331,12 +335,104 @@ export function AppSidebar({
             </SidebarMenu>
           </>
         ) : activeModule === "espiritual" ? (
-          <SidebarGroup className="p-0 px-2">
-            <SidebarGroupLabel>Espiritual</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <p className="px-2 text-xs text-sidebar-foreground/60">Em breve disponível.</p>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <>
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Rotina</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={pathname === "/espiritual"} onClick={() => router.push("/espiritual")} tooltip="Dashboard">
+                      <Activity /> Dashboard
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/espiritual/semana"}
+                      onClick={() => router.push("/espiritual/semana")}
+                      tooltip="Semana"
+                    >
+                      <CalendarCheck2 /> Semana
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/espiritual/gratidao"}
+                      onClick={() => router.push("/espiritual/gratidao")}
+                      tooltip="Gratidão"
+                    >
+                      <HeartHandshake /> Gratidão
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Pregação</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/espiritual/sermoes")}
+                      onClick={() => router.push("/espiritual/sermoes")}
+                      tooltip="Sermões"
+                    >
+                      <BookOpenText /> Sermões
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="p-0 px-2">
+              <SidebarGroupLabel>Crescimento</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/espiritual/biblia"}
+                      onClick={() => router.push("/espiritual/biblia")}
+                      tooltip="Bíblia"
+                    >
+                      <BookMarked /> Bíblia
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/espiritual/versiculos"}
+                      onClick={() => router.push("/espiritual/versiculos")}
+                      tooltip="Versículos"
+                    >
+                      <BookmarkCheck /> Versículos
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/espiritual/oracoes"}
+                      onClick={() => router.push("/espiritual/oracoes")}
+                      tooltip="Pedidos de oração"
+                    >
+                      <HandHeart /> Pedidos de oração
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator className="my-0" />
+
+            <SidebarMenu className="gap-1 px-2">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/espiritual/perfil"}
+                  onClick={() => router.push("/espiritual/perfil")}
+                  tooltip="Perfil"
+                >
+                  <Settings2 /> Perfil
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </>
         ) : (
           <>
             <SidebarGroup className="p-0 px-2">

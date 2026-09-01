@@ -6,10 +6,14 @@ import useSWR from "swr";
 import {
   Activity,
   ArrowLeftRight,
+  BookMarked,
   BookOpenText,
+  BookmarkCheck,
   Brain,
   CalendarCheck2,
   FileText,
+  HandHeart,
+  HeartHandshake,
   History,
   Layers,
   LineChart,
@@ -174,6 +178,35 @@ export function CommandPalette() {
               <TrendingUp /> Previsão
             </CommandItem>
             <CommandItem onSelect={() => go("/saude/perfil")}>
+              <Settings2 /> Perfil
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        {activeModule === "espiritual" && (
+          <CommandGroup heading="Espiritual">
+            <CommandItem onSelect={() => go("/espiritual")}>
+              <Activity /> Dashboard
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/semana")}>
+              <CalendarCheck2 /> Semana
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/gratidao")}>
+              <HeartHandshake /> Gratidão
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/sermoes")}>
+              <BookOpenText /> Sermões
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/biblia")}>
+              <BookMarked /> Bíblia
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/versiculos")}>
+              <BookmarkCheck /> Versículos
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/oracoes")}>
+              <HandHeart /> Pedidos de oração
+            </CommandItem>
+            <CommandItem onSelect={() => go("/espiritual/perfil")}>
               <Settings2 /> Perfil
             </CommandItem>
           </CommandGroup>

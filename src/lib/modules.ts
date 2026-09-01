@@ -19,7 +19,7 @@ export type ModuleDef = {
  * pedida: Espiritual, Saúde, Conhecimento, Financeiro.
  */
 export const MODULES: ModuleDef[] = [
-  { key: "espiritual", label: "Espiritual", icon: Sparkles, href: "/espiritual", themeClass: "theme-espiritual", comingSoon: true },
+  { key: "espiritual", label: "Espiritual", icon: Sparkles, href: "/espiritual", themeClass: "theme-espiritual" },
   { key: "saude", label: "Saúde", icon: Activity, href: "/saude", themeClass: "theme-saude" },
   { key: "notas", label: "Conhecimento", icon: BrainCircuit, href: "/notes" },
   { key: "financeiro", label: "Financeiro", icon: Wallet, href: "/financeiro", themeClass: "theme-financeiro" },
