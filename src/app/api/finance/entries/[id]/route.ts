@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
-import { dateFromKey, isEntryType, isRecurrenceKind } from "@/lib/finance";
+import { addDays, dateFromKey, isEntryType, isRecurrenceKind, toLocalDateKey } from "@/lib/finance";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -71,16 +71,53 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-/** Exclui UM lançamento — pra recorrente, some a série inteira (não só a ocorrência que você estava olhando). */
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * Exclui um lançamento. Pra um recorrente, `?mode=` decide o alcance:
+ * "all" (padrão) apaga a série inteira; "future" corta a recorrência ali
+ * (recurrenceEndDate = véspera de `occurrenceDate`, ou apaga tudo se for
+ * a primeira ocorrência); "single" só pula aquele dia (excludedDates),
+ * mantendo o resto da série intacto. `occurrenceDate` é obrigatório pra
+ * "future"/"single".
+ */
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireUserId();
     const { id } = await params;
     const entry = await prisma.financeEntry.findUnique({ where: { id } });
     if (!entry || entry.userId !== userId) return jsonError("Lançamento não encontrado.", 404);
 
-    await prisma.financeEntry.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get("mode") ?? "all";
+    const occurrenceDate = searchParams.get("occurrenceDate");
+
+    if (entry.recurrence === "NONE" || mode === "all") {
+      await prisma.financeEntry.delete({ where: { id } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!occurrenceDate || !DATE_RE.test(occurrenceDate)) {
+      return jsonError("Data da ocorrência é obrigatória pra excluir só uma parte da recorrência.");
+    }
+
+    if (mode === "single") {
+      const excludedDates = Array.from(new Set([...entry.excludedDates, occurrenceDate]));
+      await prisma.financeEntry.update({ where: { id }, data: { excludedDates } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (mode === "future") {
+      const entryStartKey = toLocalDateKey(entry.date);
+      if (occurrenceDate <= entryStartKey) {
+        // Cortar a partir da primeira ocorrência (ou antes) equivale a apagar a série inteira.
+        await prisma.financeEntry.delete({ where: { id } });
+        return NextResponse.json({ ok: true });
+      }
+      const cutoffKey = addDays(occurrenceDate, -1);
+      await prisma.financeEntry.update({ where: { id }, data: { recurrenceEndDate: dateFromKey(cutoffKey) } });
+      return NextResponse.json({ ok: true });
+    }
+
+    return jsonError("Modo de exclusão inválido.");
   } catch (res) {
     if (res instanceof NextResponse) return res;
     throw res;

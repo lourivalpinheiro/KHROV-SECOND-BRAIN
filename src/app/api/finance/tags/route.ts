@@ -8,6 +8,7 @@ export async function GET() {
     const tags = await prisma.financeTag.findMany({
       where: { userId },
       orderBy: { name: "asc" },
+      include: { _count: { select: { entries: true } } },
     });
     return NextResponse.json(tags);
   } catch (res) {

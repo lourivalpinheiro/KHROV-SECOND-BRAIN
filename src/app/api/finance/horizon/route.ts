@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-utils";
-import { dateFromKey, projectHorizon, toLocalDateKey, type FinanceEntryLite } from "@/lib/finance";
+import { dailyAllowance, dateFromKey, projectHorizon, toLocalDateKey, type FinanceEntryLite } from "@/lib/finance";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 731; // trava de segurança, igual à do módulo Saúde
@@ -42,13 +42,16 @@ export async function GET(req: NextRequest) {
     const startKey = toLocalDateKey(profile.startingBalanceDate);
     const spanStartKey = startKey < fromKey ? startKey : fromKey;
 
+    const variables = await prisma.financeBudgetVariable.findMany({ where: { userId } });
+    const dailyCap = dailyAllowance(variables);
+
     const rows = await prisma.financeEntry.findMany({
       where: {
         userId,
         date: { lte: dateFromKey(toKey) },
         OR: [{ recurrenceEndDate: null }, { recurrenceEndDate: { gte: dateFromKey(spanStartKey) } }],
       },
-      select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true },
+      select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true, excludedDates: true },
     });
     const entries: FinanceEntryLite[] = rows.map((r) => ({
       date: toLocalDateKey(r.date),
@@ -57,6 +60,7 @@ export async function GET(req: NextRequest) {
       recurrence: r.recurrence,
       recurrenceEndDate: r.recurrenceEndDate ? toLocalDateKey(r.recurrenceEndDate) : null,
       savingsDirection: r.savingsDirection,
+      excludedDates: r.excludedDates,
     }));
 
     const days = projectHorizon({
@@ -65,6 +69,7 @@ export async function GET(req: NextRequest) {
       startingBalanceDate: startKey,
       rangeStart: fromKey,
       rangeEnd: toKey,
+      assumedDailyAllowance: dailyCap,
     });
 
     return NextResponse.json({ profile, days });

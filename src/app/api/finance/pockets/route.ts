@@ -12,7 +12,7 @@ export async function GET() {
     const pockets = await prisma.financeSavingsPocket.findMany({
       where: { userId },
       orderBy: { createdAt: "asc" },
-      include: { entries: { select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true } } },
+      include: { entries: { select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true, excludedDates: true } } },
     });
 
     const now = new Date();
@@ -29,6 +29,7 @@ export async function GET() {
         recurrence: e.recurrence,
         recurrenceEndDate: e.recurrenceEndDate ? e.recurrenceEndDate.toISOString().slice(0, 10) : null,
         savingsDirection: e.savingsDirection,
+        excludedDates: e.excludedDates,
       }));
       const movement = pocketBalance(entries, new Date(`${rangeStartKey}T00:00:00`), new Date(`${todayKey}T00:00:00`));
       return {
@@ -40,6 +41,8 @@ export async function GET() {
         targetAmount: p.targetAmount,
         targetDate: p.targetDate ? p.targetDate.toISOString().slice(0, 10) : null,
         monthlyContribution: p.monthlyContribution,
+        cdiPercentage: p.cdiPercentage,
+        maturityDate: p.maturityDate ? p.maturityDate.toISOString().slice(0, 10) : null,
         createdAt: p.createdAt,
         balance: p.startingBalance + movement,
       };
@@ -87,8 +90,31 @@ export async function POST(req: NextRequest) {
       monthlyContribution = n;
     }
 
+    let cdiPercentage: number | null = null;
+    let maturityDate: Date | null = null;
+    if (body.cdiPercentage !== undefined && body.cdiPercentage !== null && body.cdiPercentage !== "") {
+      const n = Number(body.cdiPercentage);
+      if (!Number.isFinite(n) || n <= 0) return jsonError("Percentual do CDI inválido.");
+      cdiPercentage = n;
+    }
+    if (body.maturityDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.maturityDate)) return jsonError("Vencimento inválido.");
+      maturityDate = new Date(`${body.maturityDate}T00:00:00.000Z`);
+    }
+
     const pocket = await prisma.financeSavingsPocket.create({
-      data: { userId, name, kind, startingBalance, startingBalanceDate, targetAmount, targetDate, monthlyContribution },
+      data: {
+        userId,
+        name,
+        kind,
+        startingBalance,
+        startingBalanceDate,
+        targetAmount,
+        targetDate,
+        monthlyContribution,
+        cdiPercentage,
+        maturityDate,
+      },
     });
     return NextResponse.json(pocket, { status: 201 });
   } catch (res) {

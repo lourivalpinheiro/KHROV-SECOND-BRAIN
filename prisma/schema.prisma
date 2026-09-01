@@ -301,6 +301,15 @@ model FinanceSavingsPocket {
   targetDate          DateTime? @db.Date
   monthlyContribution Float?
 
+  /**
+   * Rentabilidade indexada ao CDI — só entra em ação quando os DOIS estão
+   * preenchidos (ver /api/finance/pockets/[id]/cdi): cdiPercentage é
+   * "110" pra "110% do CDI", maturityDate é o vencimento (a evolução para
+   * de render depois dele, ou em hoje, o que vier primeiro).
+   */
+  cdiPercentage Float?
+  maturityDate  DateTime? @db.Date
+
   entries   FinanceEntry[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -326,6 +335,8 @@ model FinanceEntry {
   recurrence    RecurrenceType   @default(NONE)
   /** Null = recorrência sem data final (a projeção futura tem um teto de qualquer forma). */
   recurrenceEndDate DateTime?    @db.Date
+  /** Ocorrências puladas (YYYY-MM-DD) — exclusão de "só essa ocorrência" numa série recorrente, sem mexer no resto. */
+  excludedDates     String[]     @default([])
 
   installmentGroupId String?
   installmentNumber  Int?

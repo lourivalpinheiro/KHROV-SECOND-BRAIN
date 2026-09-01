@@ -75,6 +75,8 @@ export type FinanceEntryLite = {
   recurrenceEndDate: string | null;
   /** Só relevante quando type=SAVINGS: DEPOSIT tira do saldo, WITHDRAWAL devolve. */
   savingsDirection?: SavingsDirection;
+  /** Ocorrências (YYYY-MM-DD) puladas dessa série — "excluir só esse dia" numa recorrência. */
+  excludedDates?: string[];
 };
 
 const MAX_OCCURRENCES_PER_ENTRY = 5000; // trava de segurança contra recorrência diária num range absurdo
@@ -106,15 +108,17 @@ function nextRecurrenceDate(date: Date, recurrence: RecurrenceKind): Date {
   }
 }
 
-/** Datas (YYYY-MM-DD) em que este lançamento (modelo/template) ocorre dentro de [rangeStart, rangeEnd]. */
+/** Datas (YYYY-MM-DD) em que este lançamento (modelo/template) ocorre dentro de [rangeStart, rangeEnd] — pulando as que estiverem em `excludedDates`. */
 export function expandOccurrences(
-  entry: Pick<FinanceEntryLite, "date" | "recurrence" | "recurrenceEndDate">,
+  entry: Pick<FinanceEntryLite, "date" | "recurrence" | "recurrenceEndDate" | "excludedDates">,
   rangeStart: Date,
   rangeEnd: Date
 ): string[] {
   const entryStart = dateFromKey(entry.date);
+  const excluded = entry.excludedDates && entry.excludedDates.length > 0 ? new Set(entry.excludedDates) : null;
 
   if (entry.recurrence === "NONE") {
+    if (excluded?.has(entry.date)) return [];
     return entryStart >= rangeStart && entryStart <= rangeEnd ? [entry.date] : [];
   }
 
@@ -126,7 +130,8 @@ export function expandOccurrences(
   let cursor = new Date(entryStart);
   let guard = MAX_OCCURRENCES_PER_ENTRY;
   while (cursor <= effectiveEnd && guard-- > 0) {
-    if (cursor >= rangeStart) out.push(toLocalDateKey(cursor));
+    const key = toLocalDateKey(cursor);
+    if (cursor >= rangeStart && !excluded?.has(key)) out.push(key);
     cursor = nextRecurrenceDate(cursor, entry.recurrence);
   }
   return out;
@@ -172,6 +177,14 @@ export type DayBreakdown = DayTotals & { date: string; net: number; balance: num
  * todo lançamento (já expandido de recorrência) no caminho — inclusive os
  * dias ANTES de rangeStart, só pra chegar no saldo de abertura certo, sem
  * incluir esses dias no resultado.
+ *
+ * `assumedDailyAllowance`, se informado, faz dias FUTUROS (depois de
+ * `today`) sem gasto diário já registrado assumirem esse valor como
+ * gasto previsto — a previsão diária funcionando como orçamento pra
+ * frente na projeção, não só um teto do dia. Cada dia recebe o valor uma
+ * vez só (não acumula de um dia pro outro — "zera à meia-noite"), e HOJE
+ * nunca é afetado (fica só com o que foi de fato registrado), então o
+ * saldo atual continua sendo real, não uma estimativa.
  */
 export function projectHorizon(params: {
   entries: FinanceEntryLite[];
@@ -179,8 +192,11 @@ export function projectHorizon(params: {
   startingBalanceDate: string;
   rangeStart: string;
   rangeEnd: string;
+  assumedDailyAllowance?: number;
+  today?: string;
 }): DayBreakdown[] {
-  const { entries, startingBalance, startingBalanceDate, rangeStart, rangeEnd } = params;
+  const { entries, startingBalance, startingBalanceDate, rangeStart, rangeEnd, assumedDailyAllowance, today } = params;
+  const todayKey = today ?? toLocalDateKey(new Date());
   const spanStartKey = startingBalanceDate < rangeStart ? startingBalanceDate : rangeStart;
   const spanStart = dateFromKey(spanStartKey);
   const rangeStartDate = dateFromKey(rangeStart);
@@ -221,6 +237,9 @@ export function projectHorizon(params: {
   while (cursor <= end && guard-- > 0) {
     const key = toLocalDateKey(cursor);
     const totals = byDate.get(key) ?? emptyDayTotals();
+    if (assumedDailyAllowance && assumedDailyAllowance > 0 && key > todayKey && totals.dailySpend === 0) {
+      totals.dailySpend = assumedDailyAllowance;
+    }
     const net = netOf(totals);
     running += net;
     if (cursor >= rangeStartDate) {
@@ -253,28 +272,20 @@ export function goalProgressPercent(balance: number, targetAmount: number): numb
  * momento (`maxAbs`), não um teto fixo. Cor de texto escolhida pelo
  * contraste com o fundo gerado.
  */
-export function heatColor(value: number, maxAbs: number): { bg: string; fg: string } {
-  const safeMax = maxAbs > 0 ? maxAbs : 1;
-  const t = Math.max(-1, Math.min(1, value / safeMax));
-  let hue: number;
-  let chroma: number;
-  let lightness: number;
+const HEAT_BANDS: { max: number; bg: string; fg: string }[] = [
+  { max: 0, bg: "oklch(0.577 0.245 27.325)", fg: "oklch(0.98 0 0)" }, // vermelho: abaixo de zero
+  { max: 1000, bg: "oklch(0.795 0.184 86.047)", fg: "oklch(0.15 0 0)" }, // amarelo: 0 a 1k
+  { max: 2000, bg: "oklch(0.792 0.209 151.711)", fg: "oklch(0.15 0 0)" }, // verde claro: 1k a 2k
+  { max: 3000, bg: "oklch(0.527 0.154 150.069)", fg: "oklch(0.98 0 0)" }, // verde escuro: 2k a 3k
+];
+const HEAT_GOLD = { bg: "oklch(0.666 0.179 58.318)", fg: "oklch(0.15 0 0)" }; // dourado: 3k+
 
-  if (t < 0) {
-    const k = 1 + t; // 0 (bem negativo) .. 1 (perto de zero)
-    hue = 27 + k * (70 - 27);
-    chroma = 0.19 - k * 0.03;
-    lightness = 0.5 + k * 0.15;
-  } else {
-    const k = t; // 0 (perto de zero) .. 1 (bem positivo)
-    hue = 70 + k * (142 - 70);
-    chroma = 0.16 + k * 0.03;
-    lightness = 0.65 - k * 0.1;
+/** Faixas fixas de valor (não relativas ao maior valor visível): vermelho abaixo de zero, amarelo até 1k, verde claro até 2k, verde escuro até 3k, dourado dali pra cima. */
+export function heatColor(value: number): { bg: string; fg: string } {
+  for (const band of HEAT_BANDS) {
+    if (value < band.max) return { bg: band.bg, fg: band.fg };
   }
-
-  const bg = `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${hue.toFixed(1)})`;
-  const fg = lightness > 0.6 ? "oklch(0.15 0 0)" : "oklch(0.98 0 0)";
-  return { bg, fg };
+  return HEAT_GOLD;
 }
 
 /** "ago/26" — cabeçalho de mês no horizonte de saldo. */
@@ -291,4 +302,55 @@ export function splitInstallments(total: number, count: number): number[] {
   const sumSoFar = base * (count - 1);
   const last = Math.round((total - sumSoFar) * 100) / 100;
   return [...installments, last];
+}
+
+export type PocketEvolutionPoint = { date: string; principal: number; adjusted: number };
+
+/**
+ * Evolução de um cofrinho indexado a %CDI: `principal` é só depósitos −
+ * resgates acumulados (sem render nenhum); `adjusted` aplica o CDI do dia
+ * (× cdiPercentage/100) compondo diariamente, ANTES de somar o
+ * movimento do dia (dinheiro que entra hoje só passa a render a partir de
+ * amanhã, convenção padrão de renda fixa). Dias sem taxa publicada
+ * (fins de semana/feriados) não rendem nada nesse dia — não inventa taxa.
+ */
+export function computeCdiEvolution(params: {
+  entries: FinanceEntryLite[];
+  startingBalance: number;
+  startingBalanceDate: string;
+  cdiPercentage: number;
+  cdiRatesByDate: Map<string, number>;
+  rangeEnd: string;
+}): PocketEvolutionPoint[] {
+  const { entries, startingBalance, startingBalanceDate, cdiPercentage, cdiRatesByDate, rangeEnd } = params;
+  const start = dateFromKey(startingBalanceDate);
+  const end = dateFromKey(rangeEnd);
+  if (end < start) return [];
+
+  const occurrences = expandEntries(entries, start, end);
+  const movementByDate = new Map<string, number>();
+  for (const occ of occurrences) {
+    if (occ.type !== "SAVINGS") continue;
+    const delta = occ.savingsDirection === "WITHDRAWAL" ? -occ.amount : occ.amount;
+    movementByDate.set(occ.date, (movementByDate.get(occ.date) ?? 0) + delta);
+  }
+
+  const points: PocketEvolutionPoint[] = [];
+  let principal = startingBalance;
+  let adjusted = startingBalance;
+  const cursor = new Date(start);
+  let guard = 3660;
+  while (cursor <= end && guard-- > 0) {
+    const key = toLocalDateKey(cursor);
+    const dailyRatePercent = cdiRatesByDate.get(key);
+    if (dailyRatePercent !== undefined) {
+      adjusted *= 1 + (dailyRatePercent / 100) * (cdiPercentage / 100);
+    }
+    const movement = movementByDate.get(key) ?? 0;
+    principal += movement;
+    adjusted += movement;
+    points.push({ date: key, principal: Math.round(principal * 100) / 100, adjusted: Math.round(adjusted * 100) / 100 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return points;
 }

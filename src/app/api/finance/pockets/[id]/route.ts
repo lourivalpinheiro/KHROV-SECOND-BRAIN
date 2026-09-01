@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const pocket = await prisma.financeSavingsPocket.findUnique({
       where: { id },
-      include: { entries: { select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true } } },
+      include: { entries: { select: { date: true, type: true, amount: true, recurrence: true, recurrenceEndDate: true, savingsDirection: true, excludedDates: true } } },
     });
     if (!pocket || pocket.userId !== userId) return jsonError("Cofrinho não encontrado.", 404);
 
@@ -26,6 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       recurrence: e.recurrence,
       recurrenceEndDate: e.recurrenceEndDate ? e.recurrenceEndDate.toISOString().slice(0, 10) : null,
       savingsDirection: e.savingsDirection,
+      excludedDates: e.excludedDates,
     }));
     const movement = pocketBalance(entries, rangeStart, now);
 
@@ -38,6 +39,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       targetAmount: pocket.targetAmount,
       targetDate: pocket.targetDate ? toLocalDateKey(pocket.targetDate) : null,
       monthlyContribution: pocket.monthlyContribution,
+      cdiPercentage: pocket.cdiPercentage,
+      maturityDate: pocket.maturityDate ? toLocalDateKey(pocket.maturityDate) : null,
       createdAt: pocket.createdAt,
       balance: pocket.startingBalance + movement,
     });
@@ -63,6 +66,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       targetAmount?: number | null;
       targetDate?: Date | null;
       monthlyContribution?: number | null;
+      cdiPercentage?: number | null;
+      maturityDate?: Date | null;
     } = {};
 
     if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
@@ -101,6 +106,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const n = Number(body.monthlyContribution);
       if (!Number.isFinite(n) || n < 0) return jsonError("Valor mensal inválido.");
       data.monthlyContribution = n;
+    }
+
+    if (body.cdiPercentage === null || body.cdiPercentage === "") {
+      data.cdiPercentage = null;
+    } else if (body.cdiPercentage !== undefined) {
+      const n = Number(body.cdiPercentage);
+      if (!Number.isFinite(n) || n <= 0) return jsonError("Percentual do CDI inválido.");
+      data.cdiPercentage = n;
+    }
+
+    if (body.maturityDate === null || body.maturityDate === "") {
+      data.maturityDate = null;
+    } else if (typeof body.maturityDate === "string") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.maturityDate)) return jsonError("Vencimento inválido.");
+      data.maturityDate = new Date(`${body.maturityDate}T00:00:00.000Z`);
     }
 
     const updated = await prisma.financeSavingsPocket.update({ where: { id }, data });

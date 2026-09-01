@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
           date: toLocalDateKey(row.date),
           recurrence: row.recurrence,
           recurrenceEndDate: row.recurrenceEndDate ? toLocalDateKey(row.recurrenceEndDate) : null,
+          excludedDates: row.excludedDates,
         },
         rangeStart,
         rangeEnd
@@ -77,6 +78,7 @@ export async function GET(req: NextRequest) {
         description: row.description,
         amount: row.amount,
         recurrence: row.recurrence,
+        recurrenceEndDate: row.recurrenceEndDate ? toLocalDateKey(row.recurrenceEndDate) : null,
         isRecurringOccurrence: row.recurrence !== "NONE",
         installmentNumber: row.installmentNumber,
         installmentTotal: row.installmentTotal,
