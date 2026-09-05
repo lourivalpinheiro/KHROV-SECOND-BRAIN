@@ -20,10 +20,16 @@ import { cn } from "@/lib/utils";
 // "note" = nota de verdade (clique navega pra /notes/[id]); "tag" = nó
 // sintetizado no client a partir das tags de cada nota (não vem do banco
 // como nó — clique navega pra /notes?tag=[tagId], estilo Obsidian).
-type GraphNode = SimulationNodeDatum & { id: string; title: string; kind: "note" | "tag"; tagId?: string };
+type GraphNode = SimulationNodeDatum & {
+  id: string;
+  title: string;
+  kind: "note" | "tag";
+  tagId?: string;
+  isHub?: boolean;
+};
 type GraphLink = SimulationLinkDatum<GraphNode>;
 type GraphData = {
-  nodes: { id: string; title: string; tags: { id: string; name: string }[] }[];
+  nodes: { id: string; title: string; isHub: boolean; tags: { id: string; name: string }[] }[];
   links: { source: string; target: string }[];
 };
 type Point = { x: number; y: number };
@@ -97,7 +103,7 @@ export function GraphView() {
     if (!data || data.nodes.length === 0) return null;
 
     // Nós de nota, como sempre veio da API.
-    const nodes: GraphNode[] = data.nodes.map((n) => ({ id: n.id, title: n.title, kind: "note" }));
+    const nodes: GraphNode[] = data.nodes.map((n) => ({ id: n.id, title: n.title, kind: "note", isHub: n.isHub }));
     const links: GraphLink[] = data.links.map((l) => ({ source: l.source, target: l.target }));
 
     // Sintetiza um nó por tag (deduplicado por id) e uma ligação nota→tag
@@ -515,19 +521,21 @@ export function GraphView() {
             const deg = layout.degree.get(n.id) ?? 0;
             // Nós pequenos e discretos, crescendo pouco com o grau — estilo
             // Obsidian, onde o destaque vem do hub ter mais linhas saindo,
-            // não de um círculo enorme.
-            const r = 4 + Math.min(9, deg * 1.3);
+            // não de um círculo enorme. Notas marcadas como Hub (ver
+            // isHub) começam maiores e mais destacadas — são "índice de
+            // assunto" de propósito, faz sentido saltar aos olhos.
+            const r = (n.isHub ? 7 : 4) + Math.min(9, deg * 1.3);
             const dim = !isDragging && hovered && !connected.has(n.id);
             const pos = nodePos(n);
             const revealed = revealedIds.has(n.id);
             // Rótulo só aparece sob demanda — hover (o nó ou um vizinho
-            // dele), zoom aproximado, ou hub bem conectado — não todos os
-            // títulos o tempo todo, que é o que vira "bagunça" ilegível
-            // com muitos nós. Tag sempre mostra (são poucas, e o nome é o
-            // que dá contexto ao nó laranja).
+            // dele), zoom aproximado, hub bem conectado, ou marcado como
+            // Hub — não todos os títulos o tempo todo, que é o que vira
+            // "bagunça" ilegível com muitos nós. Tag sempre mostra (são
+            // poucas, e o nome é o que dá contexto ao nó laranja).
             const showLabel =
               revealed &&
-              (n.kind === "tag" || transform.k > 1.15 || hovered === n.id || connected.has(n.id) || deg >= 6);
+              (n.kind === "tag" || n.isHub || transform.k > 1.15 || hovered === n.id || connected.has(n.id) || deg >= 6);
             return (
               <g
                 key={n.id}
@@ -544,16 +552,20 @@ export function GraphView() {
               >
                 <circle
                   r={r}
-                  className={n.kind === "tag" ? "fill-amber-500" : "fill-primary"}
+                  className={n.kind === "tag" ? "fill-amber-500" : n.isHub ? "fill-chart-2" : "fill-primary"}
                   stroke="var(--background)"
-                  strokeWidth={1.5}
+                  strokeWidth={n.isHub ? 2.5 : 1.5}
                 />
                 {showLabel && (
                   <text
                     x={r + 5}
                     y={4}
                     fontSize={12}
-                    className={cn("select-none", n.kind === "tag" ? "fill-amber-500" : "fill-foreground")}
+                    fontWeight={n.isHub ? 600 : 400}
+                    className={cn(
+                      "select-none",
+                      n.kind === "tag" ? "fill-amber-500" : n.isHub ? "fill-chart-2" : "fill-foreground"
+                    )}
                     style={{ fontFamily: "var(--font-sans)" }}
                   >
                     {n.title || "Sem título"}

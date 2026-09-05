@@ -16,6 +16,7 @@ import {
   HandHeart,
   HeartHandshake,
   History,
+  Landmark,
   Layers,
   LayoutDashboard,
   LineChart,
@@ -192,6 +193,15 @@ export function AppSidebar({
                       tooltip="Todas as notas"
                     >
                       <FileText /> Todas as notas
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname === "/notes" && searchParams.get("hub") === "1"}
+                      onClick={() => router.push("/notes?hub=1")}
+                      tooltip="Hubs"
+                    >
+                      <Landmark /> Hubs
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>

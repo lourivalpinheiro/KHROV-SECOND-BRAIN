@@ -90,6 +90,14 @@ model Note {
    * apaga de vez o que passou desse prazo sem ser restaurado.
    */
   deletedAt     DateTime?
+  /**
+   * Hub: marcador independente do estágio do pipeline — uma nota "índice
+   * de assunto" (ex: "Administração"), cujas notas que a linkam via
+   * wikilink são tratadas como sub-tópicos dela (ver BacklinksPanel).
+   * Não é um NoteType à parte de propósito: mistura significados
+   * diferentes (estágio de maturação vs. papel de índice) numa nota só.
+   */
+  isHub         Boolean   @default(false)
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime  @default(now())

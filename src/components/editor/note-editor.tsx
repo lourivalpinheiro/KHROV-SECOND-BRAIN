@@ -21,6 +21,7 @@ import {
   BookOpen,
   Brain,
   Download,
+  Landmark,
   Layers,
   Maximize2,
   Minimize2,
@@ -124,6 +125,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [noteType, setNoteType] = useState<NoteTypeValue>("STIMULUS");
+  const [isHub, setIsHub] = useState(false);
   const [synthesisText, setSynthesisText] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -306,6 +308,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setTitle(note.title);
     setTags(note.tags.map((t) => t.tag.name));
     setNoteType(note.type);
+    setIsHub(note.isHub);
     setSynthesisText(note.synthesisText);
     setFlashcardCount(extractFlashcards(note.content).length);
     setOutgoingLinksCount(extractLinkedNoteIds(note.content).filter((id) => id !== note.id).length);
@@ -328,6 +331,22 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       setSaveState("saved");
     } catch {
       toast.error("Erro ao salvar as tags.");
+    }
+  }
+
+  // Hub: marcador independente do estágio do pipeline (ver comentário no
+  // schema) — notas que linkam pra esta passam a aparecer como
+  // "Sub-tópicos" no painel de conexões dela, em vez de "Conexões feitas".
+  async function toggleHub() {
+    const next = !isHub;
+    setIsHub(next);
+    try {
+      const updated = await patchJSON<NoteDetail>(key, { isHub: next });
+      if (updated) mutate(key, updated, { revalidate: false });
+      toast.success(next ? "Marcada como Hub." : "Deixou de ser Hub.");
+    } catch (err) {
+      setIsHub(!next);
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar.");
     }
   }
 
@@ -599,6 +618,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
                 </span>
               );
             })()}
+            {isHub && (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-chart-2/40 px-2 py-1 text-xs text-chart-2">
+                <Landmark className="size-3.5" /> Hub
+              </span>
+            )}
             {tags.map((t) => (
               <span key={t} className="rounded-md border px-2 py-1 text-xs">
                 #{t}
@@ -621,6 +645,16 @@ export function NoteEditor({ noteId }: { noteId: string }) {
             ) : (
               <NoteTypeSelect value={noteType} onChange={requestNoteTypeChange} />
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleHub}
+              title="Notas que linkam pra esta passam a aparecer como sub-tópicos dela"
+              className={cn("h-7 gap-1.5 text-xs", isHub && "border-chart-2/50 text-chart-2 hover:text-chart-2")}
+            >
+              <Landmark className="size-3.5" /> {isHub ? "Hub" : "Marcar como Hub"}
+            </Button>
             <NoteTagInput value={tags} onChange={updateTags} />
             {note.dailyDate && (
               <Button
@@ -661,7 +695,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         {!isFullscreen && (
           <div className="mt-6 space-y-6">
             <AttachmentsPanel noteId={noteId} />
-            <BacklinksPanel noteId={noteId} />
+            <BacklinksPanel noteId={noteId} isHub={isHub} />
           </div>
         )}
       </div>

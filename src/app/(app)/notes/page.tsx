@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, FileText, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, FileText, Landmark, Plus, Trash2 } from "lucide-react";
 import { fetcher, deleteJSON } from "@/lib/api-client";
 import type { NoteListItem, TagDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export default function NotesPage() {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const types = searchParams.get("types");
+  const hub = searchParams.get("hub");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -50,15 +51,16 @@ export default function NotesPage() {
     if (from) params.set("from", from);
     if (to) params.set("to", to);
     if (types) params.set("types", types);
+    if (hub) params.set("hub", hub);
     const qs = params.toString();
     return `/api/notes${qs ? `?${qs}` : ""}`;
-  }, [tagId, tagIds, q, from, to, types]);
+  }, [tagId, tagIds, q, from, to, types, hub]);
 
   const { data: notes, isLoading } = useSWR<NoteListItem[]>(query, fetcher);
   const { data: tags } = useSWR<TagDTO[]>(tagId ? "/api/tags" : null, fetcher);
 
   const activeTag = tags?.find((t) => t.id === tagId);
-  const heading = activeTag ? `#${activeTag.name}` : "Todas as notas";
+  const heading = hub ? "Hubs" : activeTag ? `#${activeTag.name}` : "Todas as notas";
 
   const { requestCreate, gateDialog } = useNewNote();
 
@@ -189,6 +191,7 @@ function NoteCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
+          {note.isHub && <Landmark className="size-3.5 shrink-0 text-chart-2" />}
           <h3 className="line-clamp-1 font-medium">{note.title || "Nota sem título"}</h3>
           {isEmptyStimulus(note) && (
             <span

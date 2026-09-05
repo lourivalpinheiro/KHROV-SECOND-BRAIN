@@ -22,6 +22,7 @@ export async function GET() {
         select: {
           id: true,
           title: true,
+          isHub: true,
           tags: { select: { tag: { select: { id: true, name: true } } } },
         },
       }),
@@ -35,6 +36,7 @@ export async function GET() {
       nodes: notes.map((n) => ({
         id: n.id,
         title: n.title,
+        isHub: n.isHub,
         tags: n.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
       })),
       links: links.map((l) => ({ source: l.sourceNoteId, target: l.targetNoteId })),

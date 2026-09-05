@@ -15,6 +15,7 @@ import {
   HandHeart,
   HeartHandshake,
   History,
+  Landmark,
   Layers,
   LineChart,
   Moon,
@@ -141,6 +142,9 @@ export function CommandPalette() {
             </CommandItem>
             <CommandItem onSelect={() => go("/notes")}>
               <FileText /> Todas as notas
+            </CommandItem>
+            <CommandItem onSelect={() => go("/notes?hub=1")}>
+              <Landmark /> Hubs
             </CommandItem>
             <CommandItem onSelect={() => go("/graph")}>
               <Network /> Grafo

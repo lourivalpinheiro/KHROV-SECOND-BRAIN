@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const types = (searchParams.get("types")?.split(",").filter(isNoteType) ?? []) as NoteTypeValue[];
+    const hubOnly = searchParams.get("hub") === "1";
 
     const allTagIds = tagId ? [tagId, ...tagIds] : tagIds;
 
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
         userId,
         deletedAt: null,
         ...(types.length ? { type: { in: types } } : {}),
+        ...(hubOnly ? { isHub: true } : {}),
         // exige que a nota tenha TODAS as tags selecionadas
         ...(allTagIds.length ? { AND: allTagIds.map((id) => ({ tags: { some: { tagId: id } } })) } : {}),
         ...(updatedAt ? { updatedAt } : {}),

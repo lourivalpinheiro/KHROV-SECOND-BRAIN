@@ -294,25 +294,14 @@
 }
 
 /* Conceito (":Termo::Definição") — visual de glossário limpo (termo em
-   negrito + seta, tipo RemNote), com um marcador de item na frente. */
+   negrito + seta), sem marcador de item — isso é bolinha de bullet-point
+   estilo RemNote, que não é o visual que o Khrov quer. */
 .ProseMirror .concept-line {
   /* Clicável (leva ao glossário) quando não focado — daí o pointer. */
   cursor: pointer;
-  padding-left: 1.1em;
-  position: relative;
-}
-.ProseMirror .concept-line::before {
-  content: "•";
-  position: absolute;
-  left: 0;
-  color: var(--muted-foreground);
 }
 .ProseMirror .concept-editing {
   cursor: text;
-  padding-left: 0;
-}
-.ProseMirror .concept-editing::before {
-  content: none;
 }
 .ProseMirror .concept-term {
   font-weight: 600;

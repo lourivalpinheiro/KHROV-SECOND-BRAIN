@@ -55,6 +55,7 @@ export async function PATCH(
 
     if (typeof body.title === "string") data.title = body.title.trim() || "Nota sem título";
     if (typeof body.synthesisText === "string") data.synthesisText = body.synthesisText;
+    if (typeof body.isHub === "boolean") data.isHub = body.isHub;
 
     let contentDoc: TiptapDoc | undefined;
     if (body.content !== undefined) {

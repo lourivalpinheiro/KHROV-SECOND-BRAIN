@@ -14,6 +14,8 @@ export type NoteListItem = {
   dailyDate: string | null;
   /** Preenchida quando a nota está na lixeira (soft delete) — null = ativa. */
   deletedAt: string | null;
+  /** Marca a nota como um "índice de assunto" — ver BacklinksPanel. */
+  isHub: boolean;
   updatedAt: string;
   createdAt: string;
   tags: { tag: TagDTO }[];
