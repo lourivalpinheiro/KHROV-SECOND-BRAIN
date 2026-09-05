@@ -2,8 +2,30 @@
 
 import { useState } from "react";
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
-import { AlertTriangle, Info, Lightbulb, ShieldAlert, StickyNote, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Bookmark as BookmarkIcon,
+  CheckCircle2,
+  Flag,
+  Heart,
+  HelpCircle,
+  Info,
+  Lightbulb,
+  Pin,
+  Quote,
+  Rocket,
+  ShieldAlert,
+  Star,
+  StickyNote,
+  Target,
+  Trash2,
+  XCircle,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export const CALLOUT_VARIANTS = {
@@ -36,18 +58,46 @@ export const CALLOUT_VARIANTS = {
 
 export type CalloutVariant = keyof typeof CALLOUT_VARIANTS;
 
+// Ícones escolhíveis à parte da cor (variant) — clicar no ícone do
+// callout abre esse leque, independente de qual variante/cor está
+// selecionada. Inclui os mesmos 5 das variantes (pra quem só quer voltar
+// ao padrão) mais outros pra dar liberdade de verdade.
+const CALLOUT_ICONS: Record<string, LucideIcon> = {
+  info: Info,
+  warning: AlertTriangle,
+  danger: ShieldAlert,
+  tip: Lightbulb,
+  note: StickyNote,
+  check: CheckCircle2,
+  x: XCircle,
+  help: HelpCircle,
+  star: Star,
+  flag: Flag,
+  bell: Bell,
+  zap: Zap,
+  heart: Heart,
+  pin: Pin,
+  quote: Quote,
+  bookmark: BookmarkIcon,
+  rocket: Rocket,
+  target: Target,
+};
+
 /**
  * Callout: caixa colorida com ícone pra destacar um aviso/dica/nota no
  * meio do texto — conteúdo rico de verdade dentro (NodeViewContent, não
- * um textarea), pode ter parágrafos, listas etc. A cor/ícone (variant)
- * troca clicando nos botões que só aparecem com o bloco focado, mesmo
- * padrão de "controles só ao focar" do FlashcardNodeView.
+ * um textarea), pode ter parágrafos, listas etc. Cor (variant) e ícone
+ * são independentes: a cor troca nos botões da direita, o ícone troca
+ * clicando nele mesmo (abre um leque) — os dois só aparecem/ficam
+ * clicáveis com o bloco focado, mesmo padrão de "controles só ao focar"
+ * do FlashcardNodeView.
  */
 export function CalloutNodeView({ node, updateAttributes, deleteNode }: NodeViewProps) {
   const variant = ((node.attrs.variant as string) in CALLOUT_VARIANTS ? node.attrs.variant : "info") as CalloutVariant;
+  const iconKey = node.attrs.icon as string | null;
   const [focused, setFocused] = useState(false);
   const meta = CALLOUT_VARIANTS[variant];
-  const Icon = meta.icon;
+  const Icon = (iconKey && CALLOUT_ICONS[iconKey]) || meta.icon;
 
   return (
     <NodeViewWrapper
@@ -57,9 +107,42 @@ export function CalloutNodeView({ node, updateAttributes, deleteNode }: NodeView
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false);
       }}
     >
-      <span contentEditable={false} className="mt-0.5 shrink-0">
-        <Icon className="size-4" />
-      </span>
+      {focused ? (
+        <Popover>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                contentEditable={false}
+                title="Trocar ícone"
+                className="mt-0.5 shrink-0 rounded hover:opacity-70"
+              >
+                <Icon className="size-4" />
+              </button>
+            }
+          />
+          <PopoverContent className="w-auto p-1.5" align="start">
+            <div className="grid grid-cols-6 gap-0.5">
+              {Object.entries(CALLOUT_ICONS).map(([key, IconOption]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className={cn(iconKey === key && "bg-accent")}
+                  onClick={() => updateAttributes({ icon: key })}
+                >
+                  <IconOption className="size-3.5" />
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <span contentEditable={false} className="mt-0.5 shrink-0">
+          <Icon className="size-4" />
+        </span>
+      )}
       <NodeViewContent className="min-w-0 flex-1 text-sm text-foreground [&_p]:my-0" />
       {focused && (
         <div contentEditable={false} className="flex shrink-0 items-start gap-0.5">

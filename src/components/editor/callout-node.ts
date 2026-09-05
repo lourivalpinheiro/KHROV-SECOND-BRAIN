@@ -25,6 +25,8 @@ export const Callout = Node.create({
   addAttributes() {
     return {
       variant: { default: "info" },
+      /** Ícone escolhido à parte da cor — null = usa o ícone padrão da variant (ver CALLOUT_ICONS em callout-node-view.tsx). */
+      icon: { default: null },
     };
   },
 
