@@ -5,7 +5,10 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HeaderUserMenu } from "@/components/header-user-menu";
 import { CommandPalette } from "@/components/command-palette";
-import { NaneAssistant } from "@/components/nane/nane-assistant";
+// A Nane (assistente de voz/IA) foi pausada — componente e rotas
+// continuam intactos em src/components/nane e src/app/api/nane, só a
+// montagem aqui foi removida. Reativar é só voltar este import e a linha
+// <NaneAssistant /> abaixo.
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -28,7 +31,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Second Brain
           </span>
           <div className="ml-auto flex items-center gap-1">
-            <NaneAssistant />
             <ThemeToggle />
           </div>
           <HeaderUserMenu

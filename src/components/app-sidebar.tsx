@@ -90,11 +90,11 @@ export function AppSidebar({
           </span>
         </div>
 
-        {/* Trocador de módulo — só faz sentido com mais de um módulo ativo
-            (ver src/lib/modules.ts). Com um só, vira um rótulo estático em
-            vez de um dropdown sem função; os outros módulos continuam
-            inteiros no código, só pausados. */}
-        {ENABLED_MODULES.length > 1 ? (
+        {/* Trocador de módulo — só faz sentido (e só aparece) com mais de
+            um módulo ativo (ver src/lib/modules.ts). Com um só, nem rótulo
+            estático precisa: os outros módulos continuam inteiros no
+            código, só pausados. */}
+        {ENABLED_MODULES.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -123,11 +123,6 @@ export function AppSidebar({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 group-data-[collapsible=icon]:hidden">
-            <ActiveIcon className="size-3.5 shrink-0 text-primary" />
-            <span className="flex-1 truncate text-xs font-medium">{active.label}</span>
-          </div>
         )}
 
         {activeModule === "notas" && (

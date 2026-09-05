@@ -8,10 +8,6 @@ import { CONCEPT_RE } from "@/lib/concepts";
 /** Nome do evento disparado ao clicar num conceito reconhecido — note-editor.tsx escuta e navega pra /conceitos. */
 export const CONCEPT_STUDY_EVENT = "khrov:goto-concept";
 
-function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
 /** Badge pequeno e discreto — só indicador visual, quem responde ao clique é o handleClick do plugin. */
 function badgeWidget() {
   const span = document.createElement("span");
@@ -23,24 +19,34 @@ function badgeWidget() {
 }
 
 function matchConceptAt(node: ProseMirrorNode) {
-  const text = node.textContent.trim();
+  const raw = node.textContent;
+  const text = raw.trim();
   if (!text) return null;
   const match = CONCEPT_RE.exec(text);
   if (!match) return null;
   const term = match[1].trim();
   if (!term) return null;
-  return { term, definition: match[2].trim(), raw: node.textContent };
+  // Onde o separador (":", "::", ou ": :" com espaço) começa e termina
+  // dentro de `raw` — só ELE fica escondido (a sintaxe em si). "+1" pula
+  // o ":" inicial (fora do grupo 1); o fim do separador é onde o grupo 2
+  // (definição) de fato começa, sobrando o resto do texto sempre visível
+  // — a nota não pode virar só o termo sem a definição junto.
+  const leadingTrim = raw.indexOf(text);
+  const hideFrom = leadingTrim + 1 + match[1].length;
+  const hideTo = leadingTrim + (text.length - match[2].length);
+  return { term, definition: match[2].trim(), raw, hideFrom, hideTo };
 }
 
 /**
  * Reconhece parágrafos com a sintaxe de conceito (`:Termo::Definição`,
  * ver src/lib/concepts.ts) e, enquanto o editor não está com o cursor
- * naquela linha, esconde o `:` inicial e o `::Definição` — sobra só o
- * termo, como texto normal (sem estilo de callout), com um badge
- * discreto, tooltip nativo mostrando a definição completa, e CLIQUE NO
- * TEXTO leva pro glossário. Ao focar a linha pra editar (clique numa
- * linha já focada, ou navegação por teclado), volta a mostrar tudo cru.
- * Mesmo mecanismo de foco real que flashcard-highlight-extension.ts usa.
+ * naquela linha, esconde só a sintaxe (o `:` inicial e o separador do
+ * meio) — termo E definição continuam visíveis como texto normal da
+ * nota (uma nota não pode virar só "Termo" sem o resto). Ganha um
+ * sublinhado pontilhado discreto + badge indicando que é um conceito
+ * clicável (leva pro glossário). Ao focar a linha pra editar (clique numa
+ * linha já focada, ou navegação por teclado), volta a mostrar a sintaxe
+ * crua. Mesmo mecanismo de foco real que flashcard-highlight-extension.ts usa.
  */
 export const ConceptHighlight = Extension.create({
   name: "conceptHighlight",
@@ -101,7 +107,7 @@ export const ConceptHighlight = Extension.create({
               if (node.type.name !== "paragraph") return;
               const concept = matchConceptAt(node);
               if (!concept) return;
-              const { term, definition, raw } = concept;
+              const { term, hideFrom, hideTo } = concept;
 
               const nodeFrom = offset;
               const nodeTo = offset + node.nodeSize;
@@ -111,23 +117,23 @@ export const ConceptHighlight = Extension.create({
               decorations.push(
                 Decoration.node(nodeFrom, nodeTo, {
                   class: `concept-line${isFocused ? " concept-editing" : ""}`,
-                  title: definition ? `${term}\n${clip(definition, 140)}` : term,
+                  title: `Abrir "${term}" no glossário`,
                 })
               );
 
               if (!isFocused) {
-                // Esconde o ":" inicial e, a partir do "::", o resto — sobra só o termo.
-                const doubleColonIdx = raw.indexOf("::", raw.indexOf(term));
+                // Esconde só a sintaxe — o ":" inicial e o separador
+                // (":", "::" ou variantes com espaço, ver hideFrom/hideTo em
+                // matchConceptAt) — o termo E a definição continuam
+                // visíveis como texto normal da nota.
                 decorations.push(
                   Decoration.inline(paraStart, paraStart + 1, { class: "concept-hidden" })
                 );
-                if (doubleColonIdx !== -1) {
-                  decorations.push(
-                    Decoration.inline(paraStart + doubleColonIdx, paraStart + raw.length, {
-                      class: "concept-hidden",
-                    })
-                  );
-                }
+                decorations.push(
+                  Decoration.inline(paraStart + hideFrom, paraStart + hideTo, {
+                    class: "concept-hidden",
+                  })
+                );
                 decorations.push(Decoration.widget(nodeTo - 1, badgeWidget, { side: 1 }));
               }
             });

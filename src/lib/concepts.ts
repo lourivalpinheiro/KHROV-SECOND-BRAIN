@@ -2,13 +2,16 @@ import type { TiptapDoc } from "@/lib/doc-utils";
 
 /**
  * Conceito: sintaxe `:Termo::Definição` num parágrafo — `:` colado no
- * termo (sem espaço) marca o início, `::` separa termo de definição
- * (mesma convenção do cloze deletion, {{c1::resposta}}, pra reaproveitar
- * o que o usuário já sabe). Vira entrada no glossário (/conceitos) e,
- * junto, um flashcard "O que é Termo?" (ver flashcards.ts) — sem exigir
- * nada extra pra entrar na revisão espaçada.
+ * termo (sem espaço) marca o início, `::` (ou `:` seguido de espaço e mais
+ * `:`, ex: "Termo: :Definição" ou "Termo: Definição") separa termo de
+ * definição. Tolerante a espaço em volta do(s) ":" do meio de propósito —
+ * é natural digitar "Termo: Definição" com espaço, e travar só na forma
+ * exata "::" fazia a sintaxe silenciosamente "não funcionar" nesse caso
+ * comum. Vira entrada no glossário (/conceitos) e, junto, um flashcard "O
+ * que é Termo?" (ver flashcards.ts) — sem exigir nada extra pra entrar na
+ * revisão espaçada.
  */
-export const CONCEPT_RE = /^:(\S.*?)::([\s\S]*)$/;
+export const CONCEPT_RE = /^:(\S.*?)(?:\s*:)+\s*([\s\S]*)$/;
 
 export type Concept = {
   id: string;
