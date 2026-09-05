@@ -41,6 +41,7 @@ import { ConceptHighlight, CONCEPT_STUDY_EVENT } from "./concept-highlight-exten
 import { Flashcard } from "./flashcard-node";
 import { Chart } from "./chart-node";
 import { Bookmark } from "./bookmark-node";
+import { Callout } from "./callout-node";
 import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
@@ -129,7 +130,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [synthesisText, setSynthesisText] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [readingMode, setReadingMode] = useState(false);
+  // Toda nota abre em modo leitura por padrão — clicar pra editar é a
+  // exceção, não o caminho normal de só consultar o que já foi escrito.
+  const [readingMode, setReadingMode] = useState(true);
   const [flashcardCount, setFlashcardCount] = useState(0);
   // Direto do conteúdo atual da nota (não da tabela NoteLink, que só fica em
   // dia depois que o conteúdo é salvo) — pra trava de promoção refletir o
@@ -193,6 +196,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       Flashcard,
       Chart,
       Bookmark,
+      Callout,
     ],
     [noteId]
   );
@@ -309,6 +313,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setTags(note.tags.map((t) => t.tag.name));
     setNoteType(note.type);
     setIsHub(note.isHub);
+    // Abre em modo leitura por padrão (consultar é o caso comum) — exceto
+    // pra uma nota praticamente vazia, recém-criada, onde não faz sentido
+    // pedir pra sair do modo leitura só pra começar a escrever o título.
+    setReadingMode(note.plainText.trim().length > 0);
     setSynthesisText(note.synthesisText);
     setFlashcardCount(extractFlashcards(note.content).length);
     setOutgoingLinksCount(extractLinkedNoteIds(note.content).filter((id) => id !== note.id).length);

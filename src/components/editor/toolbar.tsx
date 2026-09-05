@@ -20,6 +20,7 @@ import {
   Minus,
   Layers,
   BarChart3,
+  MessageSquareWarning,
   Undo2,
   Redo2,
   AlignLeft,
@@ -164,6 +165,9 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       </Item>
       <Item label="Gráfico" onClick={() => editor.chain().focus().insertChart().run()}>
         <BarChart3 />
+      </Item>
+      <Item label="Callout" active={editor.isActive("callout")} onClick={() => editor.chain().focus().setCallout().run()}>
+        <MessageSquareWarning />
       </Item>
 
       <Separator orientation="vertical" className="mx-1 h-5" />
