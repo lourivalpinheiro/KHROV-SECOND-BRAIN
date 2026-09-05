@@ -42,6 +42,8 @@ import { Flashcard } from "./flashcard-node";
 import { Chart } from "./chart-node";
 import { Bookmark } from "./bookmark-node";
 import { Callout } from "./callout-node";
+import { VideoEmbed } from "./video-embed-node";
+import { FileEmbed } from "./file-embed-node";
 import { EditorToolbar } from "./toolbar";
 import { TableBubbleMenu } from "./table-bubble-menu";
 import { NoteTagInput } from "./note-tag-input";
@@ -195,8 +197,14 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       ConceptHighlight,
       Flashcard,
       Chart,
+      // VideoEmbed antes de Bookmark: os dois reagem a uma URL solta
+      // colada, e o ProseMirror testa handlePaste na ordem das
+      // extensões, parando no primeiro que aceitar — assim vídeo
+      // reconhecido (YouTube/Vimeo) sempre ganha de virar bookmark.
+      VideoEmbed,
       Bookmark,
       Callout,
+      FileEmbed,
     ],
     [noteId]
   );
@@ -682,7 +690,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         <div className={cn("rounded-lg", !readingMode && "border")}>
           {!readingMode && (
             <>
-              <EditorToolbar editor={editor} />
+              <EditorToolbar editor={editor} noteId={noteId} />
               <TableBubbleMenu editor={editor} />
             </>
           )}

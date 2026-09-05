@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { mutate } from "swr";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -21,6 +23,9 @@ import {
   Layers,
   BarChart3,
   MessageSquareWarning,
+  Video,
+  Paperclip,
+  Loader2,
   Undo2,
   Redo2,
   AlignLeft,
@@ -36,6 +41,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { supabaseBrowser, isSupabaseBrowserConfigured } from "@/lib/supabase-browser";
+import { ATTACHMENTS_BUCKET } from "@/lib/attachments-bucket";
+import { parseVideoUrl } from "@/lib/video-embed";
+import { toast } from "sonner";
 
 function Item({
   onClick,
@@ -64,8 +73,9 @@ function Item({
   );
 }
 
-export function EditorToolbar({ editor }: { editor: Editor | null }) {
-  if (!editor) return null;
+export function EditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: string }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function addLink() {
     const previousUrl = editor!.getAttributes("link").href as string | undefined;
@@ -82,6 +92,68 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
     const url = window.prompt("URL da imagem:");
     if (url) editor!.chain().focus().setImage({ src: url }).run();
   }
+
+  function addVideo() {
+    const url = window.prompt("URL do vídeo (YouTube ou Vimeo):");
+    if (!url) return;
+    if (!parseVideoUrl(url)) {
+      toast.error("Não reconheci essa URL como YouTube ou Vimeo.");
+      return;
+    }
+    editor!.chain().focus().insertVideoEmbed({ url }).run();
+  }
+
+  // Mesmo fluxo de 3 passos do AttachmentsPanel (signed URL → upload
+  // direto pro Supabase Storage → registra a metadata) — só que termina
+  // inserindo um bloco no corpo em vez de só listar no painel embaixo.
+  // O Attachment criado é o mesmo dos dois lugares, por isso atualiza a
+  // mesma chave de SWR da nota (pro painel de anexos refletir na hora).
+  async function uploadFile(file: File) {
+    if (!isSupabaseBrowserConfigured || !supabaseBrowser) {
+      toast.error("Armazenamento de anexos ainda não foi configurado.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const { token, storageKey } = await fetch("/api/attachments/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId, filename: file.name }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "Falha ao preparar upload.");
+        }
+        return res.json();
+      });
+
+      const { error: uploadError } = await supabaseBrowser.storage
+        .from(ATTACHMENTS_BUCKET)
+        .uploadToSignedUrl(storageKey, token, file);
+      if (uploadError) throw new Error(uploadError.message);
+
+      const mimeType = file.type || "application/octet-stream";
+      const attachment = await fetch("/api/attachments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId, filename: file.name, storageKey, mimeType, size: file.size }),
+      }).then((res) => res.json());
+
+      editor!
+        .chain()
+        .focus()
+        .insertFileEmbed({ attachmentId: attachment.id, filename: file.name, mimeType, size: file.size })
+        .run();
+      await mutate(`/api/notes/${noteId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar arquivo.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  if (!editor) return null;
 
   return (
     <div className="flex items-center gap-0.5 overflow-x-auto border-b bg-background/60 px-2 py-1.5 [&>*]:shrink-0">
@@ -151,6 +223,21 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Item label="Imagem" onClick={addImage}>
         <ImageIcon />
       </Item>
+      <Item label="Vídeo (YouTube/Vimeo)" onClick={addVideo}>
+        <Video />
+      </Item>
+      <Item label="Anexar arquivo" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+        {uploading ? <Loader2 className="animate-spin" /> : <Paperclip />}
+      </Item>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) uploadFile(file);
+        }}
+      />
       <Item
         label="Tabela"
         onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
