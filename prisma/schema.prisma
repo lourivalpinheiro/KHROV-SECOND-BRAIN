@@ -4,7 +4,15 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Transaction pooler (Supavisor, porta 6543) — feito pra muitas conexões
+  // curtas e concorrentes, o padrão de uso de funções serverless. A
+  // Session pooler (5432) usada antes tem um limite de conexões
+  // simultâneas bem menor e causava erros 500 aleatórios sob concorrência.
+  url       = env("DATABASE_URL")
+  // DDL (migrate deploy) não funciona bem em modo transaction — precisa de
+  // uma conexão "de sessão" de verdade. Session pooler (5432) serve só
+  // pra isso, nunca pras queries da aplicação em si.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
