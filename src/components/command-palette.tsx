@@ -31,7 +31,7 @@ import {
 import { fetcher, postJSON } from "@/lib/api-client";
 import type { TagDTO } from "@/types/models";
 import { useNewNote } from "@/hooks/use-new-note";
-import { MODULES, moduleFromPathname } from "@/lib/modules";
+import { ENABLED_MODULES, moduleFromPathname } from "@/lib/modules";
 import {
   CommandDialog,
   CommandEmpty,
@@ -238,9 +238,11 @@ export function CommandPalette() {
           </CommandGroup>
         )}
 
+        {ENABLED_MODULES.length > 1 && (
+        <>
         <CommandSeparator />
         <CommandGroup heading="Trocar de módulo">
-          {MODULES.map((m) => {
+          {ENABLED_MODULES.map((m) => {
             const MIcon = m.icon;
             return (
               <CommandItem key={m.key} value={`module-${m.key}`} onSelect={() => go(m.href)}>
@@ -249,6 +251,8 @@ export function CommandPalette() {
             );
           })}
         </CommandGroup>
+        </>
+        )}
 
         {activeModule === "notas" && (noteResults?.length ?? 0) > 0 && (
           <>

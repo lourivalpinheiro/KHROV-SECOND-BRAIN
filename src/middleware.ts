@@ -2,6 +2,11 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 
+// Módulos pausados (ver enabled:false em src/lib/modules.ts) — código,
+// schema e migrations continuam intactos, só a navegação pra eles é
+// redirecionada enquanto o app foca só no Conhecimento.
+const DISABLED_MODULE_PATH_PREFIXES = ["/saude", "/financeiro", "/espiritual"];
+
 // Instância separada (sem o provider de Credentials/Prisma) só pra checar a
 // sessão no middleware — mantém o bundle da Edge Function pequeno o
 // suficiente pro limite de 1MB da Vercel. A instância completa, com login
@@ -22,6 +27,10 @@ export default auth((req) => {
   const isApiCronRoute = pathname.startsWith("/api/cron/");
 
   if (isApiAuthRoute || isApiCronRoute) return NextResponse.next();
+
+  if (DISABLED_MODULE_PATH_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL("/notes", req.nextUrl));
+  }
 
   if (isAuthRoute) {
     if (isLoggedIn) {

@@ -50,7 +50,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
-import { MODULES, moduleDef, moduleFromPathname } from "@/lib/modules";
+import { ENABLED_MODULES, moduleDef, moduleFromPathname } from "@/lib/modules";
 
 export function AppSidebar({
   user,
@@ -90,37 +90,45 @@ export function AppSidebar({
           </span>
         </div>
 
-        {/* Trocador de módulo — 4 nomes não cabem como abas de texto sem
-            espremer, então é um dropdown (ícone + nome do módulo atual,
-            clica pra ver os outros 3) em vez de uma pílula de segmentos. */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
-              >
-                <ActiveIcon className="size-3.5 shrink-0 text-primary" />
-                <span className="flex-1 truncate text-xs font-medium">{active.label}</span>
-                <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50" />
-              </button>
-            }
-          />
-          <DropdownMenuContent align="start" className="w-56">
-            {MODULES.map((m) => {
-              const MIcon = m.icon;
-              return (
-                <DropdownMenuItem key={m.key} onClick={() => router.push(m.href)}>
-                  <MIcon /> {m.label}
-                  <span className="ml-auto flex items-center gap-1.5">
-                    {m.comingSoon && <span className="text-[10px] text-muted-foreground">em breve</span>}
-                    {activeModule === m.key && <Check className="size-3.5" />}
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Trocador de módulo — só faz sentido com mais de um módulo ativo
+            (ver src/lib/modules.ts). Com um só, vira um rótulo estático em
+            vez de um dropdown sem função; os outros módulos continuam
+            inteiros no código, só pausados. */}
+        {ENABLED_MODULES.length > 1 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-lg bg-sidebar-accent/50 px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
+                >
+                  <ActiveIcon className="size-3.5 shrink-0 text-primary" />
+                  <span className="flex-1 truncate text-xs font-medium">{active.label}</span>
+                  <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+                </button>
+              }
+            />
+            <DropdownMenuContent align="start" className="w-56">
+              {ENABLED_MODULES.map((m) => {
+                const MIcon = m.icon;
+                return (
+                  <DropdownMenuItem key={m.key} onClick={() => router.push(m.href)}>
+                    <MIcon /> {m.label}
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {m.comingSoon && <span className="text-[10px] text-muted-foreground">em breve</span>}
+                      {activeModule === m.key && <Check className="size-3.5" />}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 group-data-[collapsible=icon]:hidden">
+            <ActiveIcon className="size-3.5 shrink-0 text-primary" />
+            <span className="flex-1 truncate text-xs font-medium">{active.label}</span>
+          </div>
+        )}
 
         {activeModule === "notas" && (
           <form
