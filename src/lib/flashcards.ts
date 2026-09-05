@@ -24,9 +24,13 @@ type Node = {
   content?: Node[];
 };
 
+// Wikilink é um nó átomo (attrs.noteId/label, sem .text nem .content) —
+// sem tratar ele à parte, o label some do texto extraído (mesmo bug
+// corrigido em concepts.ts).
 function nodeText(node: Node | undefined): string {
   if (!node) return "";
   if (typeof node.text === "string") return node.text;
+  if (node.type === "wikiLink") return typeof node.attrs?.label === "string" ? (node.attrs.label as string) : "";
   return (node.content ?? []).map(nodeText).join("");
 }
 
