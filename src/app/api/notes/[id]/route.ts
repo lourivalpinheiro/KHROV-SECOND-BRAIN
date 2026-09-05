@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
 import { extractPlainText, extractLinkedNoteIds, type TiptapDoc } from "@/lib/doc-utils";
@@ -56,6 +57,13 @@ export async function PATCH(
     if (typeof body.title === "string") data.title = body.title.trim() || "Nota sem título";
     if (typeof body.synthesisText === "string") data.synthesisText = body.synthesisText;
     if (typeof body.isHub === "boolean") data.isHub = body.isHub;
+    // Publicar gera o shareToken uma vez só, na primeira vez — despublicar
+    // e publicar de novo depois devolve o MESMO link, não invalida o que
+    // já foi compartilhado.
+    if (typeof body.published === "boolean") {
+      data.isPublished = body.published;
+      if (body.published && !existing.shareToken) data.shareToken = randomUUID();
+    }
 
     let contentDoc: TiptapDoc | undefined;
     if (body.content !== undefined) {

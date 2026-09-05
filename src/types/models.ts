@@ -16,6 +16,9 @@ export type NoteListItem = {
   deletedAt: string | null;
   /** Marca a nota como um "índice de assunto" — ver BacklinksPanel. */
   isHub: boolean;
+  /** Publicada como página pública sem login, em /p/[shareToken]. */
+  isPublished: boolean;
+  shareToken: string | null;
   updatedAt: string;
   createdAt: string;
   tags: { tag: TagDTO }[];

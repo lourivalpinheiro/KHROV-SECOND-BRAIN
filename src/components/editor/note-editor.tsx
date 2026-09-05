@@ -20,7 +20,10 @@ import TextAlign from "@tiptap/extension-text-align";
 import {
   BookOpen,
   Brain,
+  Copy,
   Download,
+  EyeOff,
+  Globe,
   Landmark,
   Layers,
   Maximize2,
@@ -129,6 +132,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [tags, setTags] = useState<string[]>([]);
   const [noteType, setNoteType] = useState<NoteTypeValue>("STIMULUS");
   const [isHub, setIsHub] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [synthesisText, setSynthesisText] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -321,6 +326,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setTags(note.tags.map((t) => t.tag.name));
     setNoteType(note.type);
     setIsHub(note.isHub);
+    setIsPublished(note.isPublished);
+    setShareToken(note.shareToken);
     // Abre em modo leitura por padrão (consultar é o caso comum) — exceto
     // pra uma nota praticamente vazia, recém-criada, onde não faz sentido
     // pedir pra sair do modo leitura só pra começar a escrever o título.
@@ -364,6 +371,39 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       setIsHub(!next);
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar.");
     }
+  }
+
+  function publicUrl(token: string) {
+    return `${window.location.origin}/p/${token}`;
+  }
+
+  // Publicar gera o shareToken uma vez (persiste mesmo despublicando
+  // depois — republicar devolve o mesmo link, ver PATCH /api/notes/[id]).
+  async function setPublished(next: boolean) {
+    try {
+      const updated = await patchJSON<NoteDetail>(key, { published: next });
+      if (updated) {
+        mutate(key, updated, { revalidate: false });
+        setIsPublished(updated.isPublished);
+        setShareToken(updated.shareToken);
+        if (next && updated.shareToken) {
+          const url = publicUrl(updated.shareToken);
+          navigator.clipboard?.writeText(url).catch(() => {});
+          toast.success("Nota publicada — link copiado.", { description: url });
+        } else {
+          toast.success("Nota despublicada — o link parou de funcionar.");
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar.");
+    }
+  }
+
+  function copyPublicLink() {
+    if (!shareToken) return;
+    const url = publicUrl(shareToken);
+    navigator.clipboard?.writeText(url).catch(() => {});
+    toast.success("Link copiado.", { description: url });
   }
 
   function requestNoteTypeChange(newType: NoteTypeValue) {
@@ -615,6 +655,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
                 <DropdownMenuItem onClick={exportPdf}>
                   <Download /> Exportar PDF
                 </DropdownMenuItem>
+                {isPublished ? (
+                  <>
+                    <DropdownMenuItem onClick={copyPublicLink}>
+                      <Copy /> Copiar link público
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPublished(false)}>
+                      <EyeOff /> Despublicar
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem onClick={() => setPublished(true)}>
+                    <Globe /> Publicar como página
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem variant="destructive" onClick={removeNote}>
                   <Trash2 /> Excluir nota
                 </DropdownMenuItem>
@@ -638,6 +692,16 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               <span className="inline-flex items-center gap-1.5 rounded-md border border-chart-2/40 px-2 py-1 text-xs text-chart-2">
                 <Landmark className="size-3.5" /> Hub
               </span>
+            )}
+            {isPublished && (
+              <button
+                type="button"
+                onClick={copyPublicLink}
+                title="Copiar link público"
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/10"
+              >
+                <Globe className="size-3.5" /> Pública
+              </button>
             )}
             {tags.map((t) => (
               <span key={t} className="rounded-md border px-2 py-1 text-xs">

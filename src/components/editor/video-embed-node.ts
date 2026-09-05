@@ -41,7 +41,19 @@ export const VideoEmbed = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "video-embed", "data-url": String(node.attrs.url ?? "") })];
+    const url = String(node.attrs.url ?? "");
+    const embedUrl = String(node.attrs.embedUrl ?? "");
+    // Usado fora do editor vivo (generateHTML: export de PDF, linha do
+    // tempo, página pública de nota) — sem isso virava uma div vazia,
+    // já que quem renderiza de verdade dentro do editor é o NodeView
+    // React (addNodeView), que generateHTML nunca chama.
+    return [
+      "div",
+      mergeAttributes(HTMLAttributes, { "data-type": "video-embed", class: "video-embed-export" }),
+      embedUrl
+        ? ["iframe", { src: embedUrl, class: "video-embed-export-frame", allowfullscreen: "true" }]
+        : ["a", { href: url, target: "_blank", rel: "noopener noreferrer" }, url],
+    ];
   },
 
   addNodeView() {

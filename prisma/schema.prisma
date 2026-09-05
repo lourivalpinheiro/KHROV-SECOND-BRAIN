@@ -98,6 +98,14 @@ model Note {
    * diferentes (estágio de maturação vs. papel de índice) numa nota só.
    */
   isHub         Boolean   @default(false)
+  /**
+   * Publicação como página pública (sem login), em /p/[shareToken] —
+   * shareToken é gerado uma vez na primeira publicação e persiste mesmo
+   * se a nota for despublicada depois (republicar devolve o mesmo link).
+   * isPublished é quem de fato controla se a rota pública serve ou 404.
+   */
+  isPublished Boolean @default(false)
+  shareToken  String? @unique
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime  @default(now())

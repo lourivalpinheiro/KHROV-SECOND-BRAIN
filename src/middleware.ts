@@ -25,8 +25,12 @@ export default auth((req) => {
   // autenticação de quem chama é feita dentro da própria rota, via
   // CRON_SECRET (ver src/app/api/cron/purge-trash/route.ts).
   const isApiCronRoute = pathname.startsWith("/api/cron/");
+  // Notas publicadas (ver isPublished/shareToken em Note) — página e API
+  // de propósito sem login, é o que faz a nota ser "compartilhável por
+  // link" de verdade.
+  const isPublicNoteRoute = pathname.startsWith("/p/") || pathname.startsWith("/api/public/");
 
-  if (isApiAuthRoute || isApiCronRoute) return NextResponse.next();
+  if (isApiAuthRoute || isApiCronRoute || isPublicNoteRoute) return NextResponse.next();
 
   if (DISABLED_MODULE_PATH_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.redirect(new URL("/notes", req.nextUrl));

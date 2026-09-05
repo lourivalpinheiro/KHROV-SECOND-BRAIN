@@ -387,3 +387,45 @@
   font-weight: 600;
   text-align: left;
 }
+/* Renderização fora do editor vivo (export de PDF, timeline, página
+   pública de nota via generateHTML) — callout e vídeo incorporado
+   precisam de CSS aqui porque as classes Tailwind do NodeView React não
+   entram no HTML gerado, só o schema/attrs (data-*) entram. */
+[data-type="callout"] {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted-foreground) 8%, transparent);
+}
+[data-type="callout"][data-variant="info"] {
+  border-left-color: oklch(62% 0.19 260);
+  background: color-mix(in oklch, oklch(62% 0.19 260) 10%, transparent);
+}
+[data-type="callout"][data-variant="warning"] {
+  border-left-color: oklch(76% 0.16 75);
+  background: color-mix(in oklch, oklch(76% 0.16 75) 10%, transparent);
+}
+[data-type="callout"][data-variant="danger"] {
+  border-left-color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+}
+[data-type="callout"][data-variant="tip"] {
+  border-left-color: oklch(70% 0.15 155);
+  background: color-mix(in oklch, oklch(70% 0.15 155) 10%, transparent);
+}
+[data-type="callout"] > *:first-child {
+  margin-top: 0;
+}
+[data-type="callout"] > *:last-child {
+  margin-bottom: 0;
+}
+
+.video-embed-export-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 0.5rem;
+}
