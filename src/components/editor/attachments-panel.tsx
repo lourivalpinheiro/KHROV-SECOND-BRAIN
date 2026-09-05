@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
-import { Download, File, Loader2, Paperclip, Trash2 } from "lucide-react";
+import { ExternalLink, File, Loader2, Paperclip, Trash2 } from "lucide-react";
 import { fetcher, deleteJSON } from "@/lib/api-client";
+import { supabaseBrowser, isSupabaseBrowserConfigured } from "@/lib/supabase-browser";
+import { ATTACHMENTS_BUCKET } from "@/lib/attachments-bucket";
 import type { AttachmentDTO } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -24,13 +26,17 @@ export function AttachmentsPanel({ noteId }: { noteId: string }) {
 
   async function uploadFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    if (!isSupabaseBrowserConfigured || !supabaseBrowser) {
+      toast.error("Armazenamento de anexos ainda não foi configurado.");
+      return;
+    }
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
-        const { uploadUrl, r2Key } = await fetch("/api/attachments/upload-url", {
+        const { token, storageKey } = await fetch("/api/attachments/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noteId, filename: file.name, mimeType: file.type }),
+          body: JSON.stringify({ noteId, filename: file.name }),
         }).then(async (res) => {
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
@@ -39,11 +45,14 @@ export function AttachmentsPanel({ noteId }: { noteId: string }) {
           return res.json();
         });
 
-        await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-          body: file,
-        });
+        // Upload direto pro Supabase Storage com o signed URL — o
+        // arquivo nunca passa pela nossa função serverless (evita o
+        // limite de payload da Vercel pra arquivos grandes), mesmo
+        // desenho que era usado com o Cloudflare R2 antes dessa troca.
+        const { error: uploadError } = await supabaseBrowser.storage
+          .from(ATTACHMENTS_BUCKET)
+          .uploadToSignedUrl(storageKey, token, file);
+        if (uploadError) throw new Error(uploadError.message);
 
         await fetch("/api/attachments", {
           method: "POST",
@@ -51,7 +60,7 @@ export function AttachmentsPanel({ noteId }: { noteId: string }) {
           body: JSON.stringify({
             noteId,
             filename: file.name,
-            r2Key,
+            storageKey,
             mimeType: file.type || "application/octet-stream",
             size: file.size,
           }),
@@ -66,12 +75,12 @@ export function AttachmentsPanel({ noteId }: { noteId: string }) {
     }
   }
 
-  async function download(attachment: AttachmentDTO) {
+  async function openAttachment(attachment: AttachmentDTO) {
     try {
       const { url } = await fetcher<{ url: string }>(`/api/attachments/${attachment.id}`);
       window.open(url, "_blank");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao baixar anexo.");
+      toast.error(err instanceof Error ? err.message : "Erro ao abrir anexo.");
     }
   }
 
@@ -125,10 +134,17 @@ export function AttachmentsPanel({ noteId }: { noteId: string }) {
             className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-sm"
           >
             <File className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{a.filename}</span>
+            <button
+              type="button"
+              onClick={() => openAttachment(a)}
+              className="min-w-0 flex-1 truncate text-left hover:underline"
+              title="Abrir em outra aba"
+            >
+              {a.filename}
+            </button>
             <span className="shrink-0 text-xs text-muted-foreground">{formatSize(a.size)}</span>
-            <Button variant="ghost" size="icon" className="size-6" onClick={() => download(a)}>
-              <Download className="size-3.5" />
+            <Button variant="ghost" size="icon" className="size-6" onClick={() => openAttachment(a)}>
+              <ExternalLink className="size-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="size-6" onClick={() => remove(a)}>
               <Trash2 className="size-3.5" />

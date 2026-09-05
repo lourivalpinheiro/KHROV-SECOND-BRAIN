@@ -18,6 +18,17 @@ function badgeWidget() {
   return span;
 }
 
+// Entra no lugar do separador escondido — "Termo → Definição", visual de
+// glossário limpo (ex: RemNote), em vez de só remover os ":" e deixar
+// tudo grudado ou com um espaço mudo sem indicar nada.
+function arrowWidget() {
+  const span = document.createElement("span");
+  span.className = "concept-arrow";
+  span.contentEditable = "false";
+  span.textContent = " → ";
+  return span;
+}
+
 function matchConceptAt(node: ProseMirrorNode) {
   const raw = node.textContent;
   const text = raw.trim();
@@ -125,15 +136,20 @@ export const ConceptHighlight = Extension.create({
                 // Esconde só a sintaxe — o ":" inicial e o separador
                 // (":", "::" ou variantes com espaço, ver hideFrom/hideTo em
                 // matchConceptAt) — o termo E a definição continuam
-                // visíveis como texto normal da nota.
+                // visíveis, termo em negrito e uma seta no lugar do
+                // separador (visual de glossário, tipo RemNote).
                 decorations.push(
                   Decoration.inline(paraStart, paraStart + 1, { class: "concept-hidden" })
+                );
+                decorations.push(
+                  Decoration.inline(paraStart + 1, paraStart + hideFrom, { class: "concept-term" })
                 );
                 decorations.push(
                   Decoration.inline(paraStart + hideFrom, paraStart + hideTo, {
                     class: "concept-hidden",
                   })
                 );
+                decorations.push(Decoration.widget(paraStart + hideTo, arrowWidget, { side: -1 }));
                 decorations.push(Decoration.widget(nodeTo - 1, badgeWidget, { side: 1 }));
               }
             });

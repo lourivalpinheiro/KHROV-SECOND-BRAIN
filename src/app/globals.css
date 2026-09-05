@@ -293,19 +293,33 @@
   height: 100%;
 }
 
-/* Conceito (":Termo::Definição") — mesma filosofia dos flashcards em
-   texto puro: nada de callout, só um indício sutil de que tem algo ali. */
+/* Conceito (":Termo::Definição") — visual de glossário limpo (termo em
+   negrito + seta, tipo RemNote), com um marcador de item na frente. */
 .ProseMirror .concept-line {
   /* Clicável (leva ao glossário) quando não focado — daí o pointer. */
   cursor: pointer;
-  text-decoration: underline dotted;
-  text-decoration-color: var(--chart-2);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
+  padding-left: 1.1em;
+  position: relative;
+}
+.ProseMirror .concept-line::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--muted-foreground);
 }
 .ProseMirror .concept-editing {
   cursor: text;
-  text-decoration: none;
+  padding-left: 0;
+}
+.ProseMirror .concept-editing::before {
+  content: none;
+}
+.ProseMirror .concept-term {
+  font-weight: 600;
+}
+.concept-arrow {
+  color: var(--chart-2);
+  white-space: pre;
 }
 .ProseMirror .concept-hidden {
   display: none;

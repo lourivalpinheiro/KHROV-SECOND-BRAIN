@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, jsonError } from "@/lib/api-utils";
-import { r2, R2_BUCKET, isR2Configured } from "@/lib/r2";
+import { supabaseStorage, ATTACHMENTS_BUCKET, isSupabaseStorageConfigured } from "@/lib/supabase-storage";
 
-/** Retorna uma URL presignada de download (o bucket é privado). */
+/**
+ * Retorna uma signed URL de visualização (o bucket é privado) — sem
+ * `download`, de propósito: o pedido é abrir o anexo numa aba nova
+ * (PDF/imagem renderizados pelo navegador), não forçar "salvar arquivo".
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,19 +19,15 @@ export async function GET(
     const attachment = await prisma.attachment.findUnique({ where: { id } });
     if (!attachment || attachment.userId !== userId) return jsonError("Anexo não encontrado.", 404);
 
-    if (!isR2Configured || !r2) return jsonError("Armazenamento não configurado.", 503);
+    if (!isSupabaseStorageConfigured || !supabaseStorage) return jsonError("Armazenamento não configurado.", 503);
 
-    const url = await getSignedUrl(
-      r2,
-      new GetObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: attachment.r2Key,
-        ResponseContentDisposition: `attachment; filename="${attachment.filename}"`,
-      }),
-      { expiresIn: 300 }
-    );
+    const { data, error } = await supabaseStorage.storage
+      .from(ATTACHMENTS_BUCKET)
+      .createSignedUrl(attachment.storageKey, 300);
 
-    return NextResponse.json({ url });
+    if (error || !data) return jsonError("Erro ao gerar link de visualização.", 502);
+
+    return NextResponse.json({ url: data.signedUrl });
   } catch (res) {
     if (res instanceof NextResponse) return res;
     throw res;
@@ -47,8 +45,8 @@ export async function DELETE(
     const attachment = await prisma.attachment.findUnique({ where: { id } });
     if (!attachment || attachment.userId !== userId) return jsonError("Anexo não encontrado.", 404);
 
-    if (isR2Configured && r2) {
-      await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: attachment.r2Key })).catch(() => {});
+    if (isSupabaseStorageConfigured && supabaseStorage) {
+      await supabaseStorage.storage.from(ATTACHMENTS_BUCKET).remove([attachment.storageKey]).catch(() => {});
     }
 
     await prisma.attachment.delete({ where: { id } });

@@ -164,16 +164,17 @@ model NoteLink {
 }
 
 model Attachment {
-  id        String   @id @default(cuid())
-  filename  String
-  r2Key     String
-  mimeType  String
-  size      Int
-  noteId    String
-  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  filename   String
+  /** Caminho do objeto no bucket "attachments" do Supabase Storage. */
+  storageKey String
+  mimeType   String
+  size       Int
+  noteId     String
+  note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 
   @@index([noteId])
   @@index([userId])
