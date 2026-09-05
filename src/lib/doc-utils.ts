@@ -43,3 +43,60 @@ export function extractLinkedNoteIds(doc: TiptapDoc | null | undefined): string[
 }
 
 export const EMPTY_DOC: TiptapDoc = { type: "doc", content: [{ type: "paragraph" }] };
+
+/** Um trecho de texto do contexto de um link — `isLink` marca o pedaço que é o próprio wikilink (label), pra destacar na UI. */
+export type LinkContextSegment = { text: string; isLink?: boolean };
+export type LinkContext = { segments: LinkContextSegment[] };
+
+const BLOCK_TYPES = new Set(["paragraph", "heading"]);
+
+function flattenInlineSegments(node: TiptapNode): LinkContextSegment[] {
+  const segments: LinkContextSegment[] = [];
+  function inner(n: TiptapNode) {
+    if (typeof n.text === "string") {
+      segments.push({ text: n.text });
+      return;
+    }
+    if (n.type === "wikiLink") {
+      segments.push({ text: typeof n.attrs?.label === "string" ? (n.attrs.label as string) : "", isLink: true });
+      return;
+    }
+    n.content?.forEach(inner);
+  }
+  inner(node);
+  return segments;
+}
+
+function containsWikiLinkTo(node: TiptapNode, targetNoteId: string): boolean {
+  let found = false;
+  walk(node, (n) => {
+    if (n.type === "wikiLink" && n.attrs?.noteId === targetNoteId) found = true;
+  });
+  return found;
+}
+
+/**
+ * Pra cada bloco (parágrafo ou título) do documento que menciona
+ * `targetNoteId` via wikilink, devolve o texto do bloco inteiro,
+ * segmentado pra poder destacar o pedaço que é o link — é o "onde ela foi
+ * mencionada" que aparece no painel de Conexões, em vez de só o título da
+ * nota de origem.
+ */
+export function extractLinkContexts(doc: TiptapDoc | null | undefined, targetNoteId: string): LinkContext[] {
+  if (!doc) return [];
+  const contexts: LinkContext[] = [];
+
+  function walkBlocks(node: TiptapNode) {
+    if (node.type && BLOCK_TYPES.has(node.type)) {
+      if (containsWikiLinkTo(node, targetNoteId)) {
+        const segments = flattenInlineSegments(node).filter((s) => s.text);
+        if (segments.length > 0) contexts.push({ segments });
+      }
+      return;
+    }
+    node.content?.forEach(walkBlocks);
+  }
+
+  walkBlocks(doc);
+  return contexts;
+}

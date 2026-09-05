@@ -7,8 +7,11 @@ import { ArrowUpRight, ArrowDownLeft, ChevronDown, Link2 } from "lucide-react";
 import { fetcher } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
+type LinkContextSegment = { text: string; isLink?: boolean };
+type LinkContext = { segments: LinkContextSegment[] };
 type Backlink = { id: string; title: string; updatedAt: string };
-type BacklinksResponse = { incoming: Backlink[]; outgoing: Backlink[] };
+type IncomingBacklink = Backlink & { contexts: LinkContext[] };
+type BacklinksResponse = { incoming: IncomingBacklink[]; outgoing: Backlink[] };
 
 function NoteList({ notes }: { notes: Backlink[] }) {
   return (
@@ -21,6 +24,51 @@ function NoteList({ notes }: { notes: Backlink[] }) {
           >
             {n.title || "Nota sem título"}
           </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Um trecho de contexto: o parágrafo/título inteiro de onde a nota atual foi mencionada, com o próprio link destacado — não só o título da nota de origem. */
+function ContextExcerpt({ context }: { context: LinkContext }) {
+  return (
+    <p className="text-sm leading-relaxed text-muted-foreground">
+      {context.segments.map((seg, i) =>
+        seg.isLink ? (
+          <span key={i} className="font-medium text-primary">
+            {seg.text}
+          </span>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        )
+      )}
+    </p>
+  );
+}
+
+function IncomingList({ notes }: { notes: IncomingBacklink[] }) {
+  return (
+    <ul className="space-y-2">
+      {notes.map((n) => (
+        <li key={n.id} className="rounded-md border bg-card p-2.5">
+          <Link
+            href={`/notes/${n.id}`}
+            className="mb-1.5 block truncate text-sm font-medium hover:text-primary"
+          >
+            {n.title || "Nota sem título"}
+          </Link>
+          {n.contexts.length > 0 ? (
+            <ul className="space-y-1 border-l-2 pl-2.5">
+              {n.contexts.map((ctx, i) => (
+                <li key={i}>
+                  <ContextExcerpt context={ctx} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground/70">(sem trecho de texto pra mostrar)</p>
+          )}
         </li>
       ))}
     </ul>
@@ -70,7 +118,7 @@ export function BacklinksPanel({ noteId }: { noteId: string }) {
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowDownLeft className="size-3.5" /> Esta nota veio de uma conexão em ({incoming.length})
               </p>
-              <NoteList notes={incoming} />
+              <IncomingList notes={incoming} />
             </div>
           )}
         </div>
